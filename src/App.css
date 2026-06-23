@@ -1,0 +1,146 @@
+.app-layout {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: #f4f6f8;
+}
+
+.sidebar {
+  width: 250px;
+  min-width: 250px;
+  min-height: 100vh;
+  background: #111827;
+  color: white;
+  padding: 24px 16px;
+  transition: width 0.25s ease, min-width 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.closed {
+  width: 80px;
+  min-width: 80px;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-container img {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.logo-container span {
+  font-weight: 600;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.toggle-btn {
+  border: none;
+  background: #1f2937;
+  color: white;
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.sidebar .menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  color: #d1d5db;
+  text-decoration: none;
+  font-size: 18px;
+  transition: 0.2s;
+}
+
+.sidebar .menu-item:hover,
+.sidebar .menu-item.active {
+  background: #2563eb;
+  color: white;
+}
+
+.sidebar.closed .menu-item {
+  justify-content: center;
+  padding: 12px;
+}
+
+.sidebar.closed .menu-item.active,
+.sidebar.closed .menu-item:hover {
+  background: transparent;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.user-name {
+  font-weight: 600;
+}
+
+.user-role {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  padding: 32px 40px;
+  overflow-x: hidden;
+}
+
+.topbar {
+  height: 70px;
+  background: white;
+  border-radius: 12px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.topbar-title {
+  font-size: 22px;
+  font-weight: 700;
+}
