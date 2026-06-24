@@ -3,12 +3,16 @@ import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { getContracts } from "../services/databaseService";
 import "./Finance.css";
+import Drawer from "../components/Drawer/Drawer";
+import FinanceDetail from "../components/FinanceDetail/FinanceDetail";
 
 function Finance() {
   const contracts = getContracts();
   const [activeTab, setActiveTab] = useState("supplier");
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tümü");
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
 
   const supplierPaymentRows = contracts.flatMap((contract) => {
     const hakedisler = contract.finansData?.hakedisler || [];
@@ -184,21 +188,39 @@ const filteredRows = supplierPaymentRows.filter((row) => {
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
-       
+
+       {/* <div className="status-filters">
+        {["Tümü", "Ödenen", "Bekleyen", "Geciken"].map((status) => (
+          <button
+            key={status}
+            className={statusFilter === status ? "active" : ""}
+            onClick={() => setStatusFilter(status)}
+          >
+            {status}
+          </button>
+        ))}
+      </div> */}
 
             <div style={{ height: 560, width: "100%" }}>
               <DataGrid
-                rows={filteredRows}
-                columns={columns}
-                pageSizeOptions={[10, 25, 50]}
-                initialState={{
-                  pagination: {
-                    paginationModel: { pageSize: 10, page: 0 },
-                  },
-                }}
-                localeText={trTR.components.MuiDataGrid.defaultProps.localeText}
-                disableRowSelectionOnClick
-              />
+              rows={filteredRows}
+              columns={columns}
+              pageSizeOptions={[10, 25, 50]}
+              initialState={{
+                pagination: {
+                  paginationModel: { pageSize: 10, page: 0 },
+                },
+              }}
+              localeText={trTR.components.MuiDataGrid.defaultProps.localeText}
+              disableRowSelectionOnClick
+              onRowClick={(params) => {
+              setSelectedRow(params.row);
+              setSelectedRowId(params.id);
+            }}
+            getRowClassName={(params) =>
+            params.id === selectedRowId ? "selected-grid-row" : ""
+             }
+            />
             </div>
           </>
         )}
@@ -215,6 +237,15 @@ const filteredRows = supplierPaymentRows.filter((row) => {
           <p>Finansal analiz bölümü eklenecek.</p>
         )}
       </div>
+      <Drawer
+        isOpen={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title="Ödeme Detayı"
+        subtitle={selectedRow?.sozlesmeNo}
+        width={520}
+      >
+        <FinanceDetail selectedRow={selectedRow} />
+      </Drawer>
     </>
   );
 }

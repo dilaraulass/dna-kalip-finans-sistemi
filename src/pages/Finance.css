@@ -234,3 +234,11 @@
   outline: 3px solid white;
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.18);
 }
+
+.selected-grid-row {
+  background-color: #eff6ff !important;
+}
+
+.selected-grid-row:hover {
+  background-color: #dbeafe !important;
+}
