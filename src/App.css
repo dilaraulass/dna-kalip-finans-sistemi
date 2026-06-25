@@ -144,3 +144,48 @@
   font-size: 22px;
   font-weight: 700;
 }
+
+@media (max-width: 720px) {
+  .sidebar,
+  .sidebar.closed {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    min-height: 100vh;
+    padding: 16px 10px;
+  }
+
+  .sidebar-header {
+    justify-content: center;
+  }
+
+  .sidebar .logo-container,
+  .sidebar .menu-item span {
+    display: none;
+  }
+
+  .sidebar .menu-item,
+  .sidebar.closed .menu-item {
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .content {
+    width: calc(100% - 72px);
+    margin-left: 72px;
+    padding: 16px;
+  }
+
+  .topbar {
+    min-height: 64px;
+    height: auto;
+    padding: 14px 16px;
+  }
+
+  .topbar-title {
+    font-size: 17px;
+  }
+}

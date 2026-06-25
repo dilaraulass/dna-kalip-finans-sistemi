@@ -11,6 +11,7 @@
   height: 100vh;
   background: white;
   overflow-y: auto;
+  max-width: 100vw;
 
   box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);
 
@@ -70,4 +71,15 @@
 
 .drawer-content {
   padding: 24px;
+}
+
+@media (max-width: 720px) {
+  .drawer-header,
+  .drawer-content {
+    padding: 18px;
+  }
+
+  .drawer-header h2 {
+    font-size: 20px;
+  }
 }

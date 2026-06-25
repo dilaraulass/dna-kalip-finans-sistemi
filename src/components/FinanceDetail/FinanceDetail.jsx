@@ -1,13 +1,14 @@
 import "./FinanceDetail.css";
+import { formatMoney } from "../../services/financeService";
 
-function FinanceDetail({ selectedRow }) {
+function FinanceDetail({ selectedRow, displayCurrency }) {
   if (!selectedRow) return null;
 
   return (
     <div className="finance-detail">
       <div className="finance-detail-status">
-        <span className={`status-badge ${selectedRow.durum.toLowerCase()}`}>
-          {selectedRow.durum}
+        <span className={`status-badge ${selectedRow.statusKey}`}>
+          {selectedRow.status}
         </span>
       </div>
 
@@ -17,34 +18,37 @@ function FinanceDetail({ selectedRow }) {
         <div className="finance-detail-grid">
           <div>
             <span>Sözleşme No</span>
-            <strong>{selectedRow.sozlesmeNo}</strong>
+            <strong>{selectedRow.contractNumber}</strong>
           </div>
 
           <div>
-            <span>Tedarikçi</span>
-            <strong>{selectedRow.tedarikci}</strong>
+            <span>Firma</span>
+            <strong>{selectedRow.company}</strong>
           </div>
 
           <div>
             <span>İş Emri No</span>
-            <strong>{selectedRow.isEmriNo}</strong>
+            <strong>{selectedRow.workOrder}</strong>
           </div>
 
           <div>
             <span>Referans No</span>
-            <strong>{selectedRow.referansNo}</strong>
+            <strong>{selectedRow.referenceNumber}</strong>
           </div>
 
           <div>
             <span>Sözleşme Bedeli</span>
             <strong>
-              {Number(selectedRow.sozlesmeBedeli).toLocaleString("tr-TR")}
+              {formatMoney(
+                selectedRow.convertedContractAmount,
+                displayCurrency,
+              )}
             </strong>
           </div>
 
           <div>
-            <span>Para Birimi</span>
-            <strong>{selectedRow.paraBirimi}</strong>
+            <span>Orijinal Para Birimi</span>
+            <strong>{selectedRow.currency}</strong>
           </div>
         </div>
       </div>
@@ -55,22 +59,29 @@ function FinanceDetail({ selectedRow }) {
         <div className="finance-detail-grid">
           <div>
             <span>Hakediş Oranı</span>
-            <strong>%{selectedRow.hakedisOrani}</strong>
+            <strong>%{selectedRow.milestoneRate}</strong>
           </div>
 
           <div>
             <span>Tutar</span>
-            <strong>{selectedRow.tutar}</strong>
+            <strong>
+              {formatMoney(selectedRow.convertedAmount, displayCurrency)}
+            </strong>
           </div>
 
           <div>
             <span>Onay Tarihi</span>
-            <strong>{selectedRow.onayTarihi || "-"}</strong>
+            <strong>{selectedRow.approvalDate || "-"}</strong>
           </div>
 
           <div>
             <span>Ödeme Tarihi</span>
-            <strong>{selectedRow.odemeTarihi || "-"}</strong>
+            <strong>{selectedRow.paymentDate || "-"}</strong>
+          </div>
+
+          <div>
+            <span>Vade</span>
+            <strong>{selectedRow.activeDueDays} gün</strong>
           </div>
         </div>
       </div>
@@ -79,7 +90,8 @@ function FinanceDetail({ selectedRow }) {
         <h3>Hakediş Şartı</h3>
 
         <p className="finance-detail-note">
-          {selectedRow.hakedisSarti}
+          {selectedRow.milestoneCondition}
+          {selectedRow.subMilestone && ` — ${selectedRow.subMilestone}`}
         </p>
       </div>
       <div className="finance-detail-actions">
