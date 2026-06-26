@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildExpenseInvoices,
+  buildFinancialAnalysis,
   buildFinanceMilestones,
   convertAmount,
   extractAmount,
@@ -131,4 +132,75 @@ test("buildExpenseInvoices maps invoice fields and explicit paid status", () => 
   assert.equal(invoices[0].expectedPaymentDate, "2026-01-31");
   assert.equal(invoices[0].paymentDateDifference, 5);
   assert.equal(invoices[0].statusKey, "paid");
+});
+
+test("buildFinancialAnalysis separates real and pending profit", () => {
+  const report = buildFinancialAnalysis({
+    customerRows: [
+      {
+        id: "customer-1",
+        workOrder: "26001",
+        contractNumber: "M-001",
+        company: "Müşteri A",
+        milestoneCondition: "Teslim",
+        convertedAmount: 1000,
+        paymentStatus: "paid",
+        statusKey: "paid",
+        status: "Ödenen",
+        paymentDate: "2026-01-10",
+      },
+      {
+        id: "customer-2",
+        workOrder: "26001",
+        contractNumber: "M-001",
+        company: "Müşteri A",
+        milestoneCondition: "Kapanış",
+        convertedAmount: 500,
+        paymentStatus: "pending",
+        statusKey: "pending",
+        status: "Bekleyen",
+        approvalDate: "2026-01-20",
+      },
+    ],
+    supplierRows: [
+      {
+        id: "supplier-1",
+        workOrder: "26001",
+        contractNumber: "T-001",
+        company: "Tedarikçi A",
+        milestoneCondition: "İmalat",
+        convertedAmount: 300,
+        paymentStatus: "paid",
+        statusKey: "paid",
+        status: "Ödenen",
+        paymentDate: "2026-01-12",
+      },
+    ],
+    expenseRows: [
+      {
+        id: "expense-1",
+        workOrder: "26001",
+        invoiceType: "Fason",
+        company: "Ek Gider A",
+        convertedAmount: 200,
+        paymentStatus: "pending",
+        statusKey: "pending",
+        status: "Bekleyen",
+        invoiceDate: "2026-01-15",
+      },
+    ],
+    mode: "project",
+    workOrder: "26001",
+  });
+
+  assert.equal(report.totals.paidIncome, 1000);
+  assert.equal(report.totals.pendingIncome, 500);
+  assert.equal(report.totals.paidExpense, 300);
+  assert.equal(report.totals.pendingExpense, 200);
+  assert.equal(report.totals.realProfit, 700);
+  assert.equal(report.totals.pendingProfit, 300);
+  assert.equal(report.totals.totalProfit, 1000);
+  assert.equal(report.totals.margin, 66.7);
+  assert.equal(report.incomeDetails.length, 2);
+  assert.equal(report.expenseDetails.length, 2);
 });

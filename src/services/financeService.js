@@ -325,6 +325,184 @@ export function buildExpenseInvoices(expenses) {
   });
 }
 
+function getAnalysisAmount(row) {
+  return row.convertedAmount ?? row.amount ?? 0;
+}
+
+function getAnalysisDate(row, source) {
+  if (source === "expense") {
+    return row.paymentDate || row.invoiceDate || "";
+  }
+
+  return row.paymentDate || row.approvalDate || row.contractDate || "";
+}
+
+function matchesAnalysisFilters(row, source, filters) {
+  const workOrder = row.workOrder || (source === "expense" ? "GENEL" : "-");
+  const date = getAnalysisDate(row, source);
+
+  if (
+    filters.mode === "project" &&
+    filters.workOrder &&
+    filters.workOrder !== "all" &&
+    workOrder !== filters.workOrder
+  ) {
+    return false;
+  }
+
+  if (
+    filters.mode === "monthly" &&
+    filters.month &&
+    !date.startsWith(filters.month)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function sortAnalysisDetails(first, second) {
+  const firstWorkOrder =
+    first.workOrder === "-" || first.workOrder === "GENEL"
+      ? "ZZZ"
+      : first.workOrder || "ZZZ";
+  const secondWorkOrder =
+    second.workOrder === "-" || second.workOrder === "GENEL"
+      ? "ZZZ"
+      : second.workOrder || "ZZZ";
+  const workOrderComparison = firstWorkOrder.localeCompare(
+    secondWorkOrder,
+    "tr",
+    { numeric: true },
+  );
+
+  if (workOrderComparison !== 0) return workOrderComparison;
+
+  return (second.date || "").localeCompare(first.date || "");
+}
+
+export function buildFinancialAnalysis({
+  customerRows = [],
+  supplierRows = [],
+  expenseRows = [],
+  mode = "general",
+  workOrder = "all",
+  month = "",
+} = {}) {
+  const totals = {
+    paidIncome: 0,
+    pendingIncome: 0,
+    totalIncome: 0,
+    paidExpense: 0,
+    pendingExpense: 0,
+    totalExpense: 0,
+    realProfit: 0,
+    pendingProfit: 0,
+    totalProfit: 0,
+    margin: 0,
+  };
+  const filters = { mode, workOrder, month };
+  const details = [];
+
+  customerRows.forEach((row) => {
+    if (!matchesAnalysisFilters(row, "customer", filters)) return;
+
+    const amount = getAnalysisAmount(row);
+    if (amount <= 0) return;
+
+    const paid = row.paymentStatus === "paid";
+
+    if (paid) totals.paidIncome += amount;
+    else totals.pendingIncome += amount;
+
+    details.push({
+      id: `income-${row.id}`,
+      source: "income",
+      workOrder: row.workOrder || "-",
+      date: getAnalysisDate(row, "customer") || "-",
+      type: "Müşteri Tahsilatı",
+      description: `${row.contractNumber} / ${row.company} - ${row.milestoneCondition}${
+        row.subMilestone ? ` (${row.subMilestone})` : ""
+      }`,
+      income: amount,
+      expense: 0,
+      statusKey: row.statusKey,
+      status: row.status,
+    });
+  });
+
+  supplierRows.forEach((row) => {
+    if (!matchesAnalysisFilters(row, "supplier", filters)) return;
+
+    const amount = getAnalysisAmount(row);
+    if (amount <= 0) return;
+
+    const paid = row.paymentStatus === "paid";
+
+    if (paid) totals.paidExpense += amount;
+    else totals.pendingExpense += amount;
+
+    details.push({
+      id: `supplier-${row.id}`,
+      source: "expense",
+      workOrder: row.workOrder || "-",
+      date: getAnalysisDate(row, "supplier") || "-",
+      type: "Tedarikçi Ödemesi",
+      description: `${row.contractNumber} / ${row.company} - ${row.milestoneCondition}${
+        row.subMilestone ? ` (${row.subMilestone})` : ""
+      }`,
+      income: 0,
+      expense: amount,
+      statusKey: row.statusKey,
+      status: row.status,
+    });
+  });
+
+  expenseRows.forEach((row) => {
+    if (!matchesAnalysisFilters(row, "expense", filters)) return;
+
+    const amount = getAnalysisAmount(row);
+    if (amount <= 0) return;
+
+    const paid = row.paymentStatus === "paid";
+
+    if (paid) totals.paidExpense += amount;
+    else totals.pendingExpense += amount;
+
+    details.push({
+      id: `invoice-${row.id}`,
+      source: "expense",
+      workOrder: row.workOrder || "GENEL",
+      date: getAnalysisDate(row, "expense") || "-",
+      type: "Ek Gider Faturası",
+      description: `${row.invoiceType} / ${row.company}`,
+      income: 0,
+      expense: amount,
+      statusKey: row.statusKey,
+      status: row.status,
+    });
+  });
+
+  totals.totalIncome = totals.paidIncome + totals.pendingIncome;
+  totals.totalExpense = totals.paidExpense + totals.pendingExpense;
+  totals.realProfit = totals.paidIncome - totals.paidExpense;
+  totals.pendingProfit = totals.pendingIncome - totals.pendingExpense;
+  totals.totalProfit = totals.totalIncome - totals.totalExpense;
+  totals.margin =
+    totals.totalIncome > 0
+      ? Number(((totals.totalProfit / totals.totalIncome) * 100).toFixed(1))
+      : 0;
+
+  details.sort(sortAnalysisDetails);
+
+  return {
+    totals,
+    details,
+    incomeDetails: details.filter((detail) => detail.income > 0),
+    expenseDetails: details.filter((detail) => detail.expense > 0),
+  };
+}
+
 export function convertAmount(amount, fromCurrency, toCurrency, rates) {
   if (!amount || fromCurrency === toCurrency) return amount || 0;
 

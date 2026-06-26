@@ -8,6 +8,7 @@ import {
 } from "../services/databaseService";
 import {
   buildExpenseInvoices,
+  buildFinancialAnalysis,
   buildFinanceMilestones,
   convertAmount,
   formatMoney,
@@ -25,6 +26,12 @@ const STATUS_FILTERS = {
   overdue: "Geciken",
 };
 
+const ANALYSIS_MODES = {
+  general: "Genel Durum",
+  monthly: "Aylık Rapor",
+  project: "İş Emri (Proje)",
+};
+
 function Finance() {
   const contracts = getContracts();
   const settings = getSettings();
@@ -37,28 +44,58 @@ function Finance() {
   const [dateEnd, setDateEnd] = useState("");
   const [displayCurrency, setDisplayCurrency] = useState("EUR");
   const [expenseViewMode, setExpenseViewMode] = useState("grouped");
+  const [reportMode, setReportMode] = useState("general");
+  const [reportMonth, setReportMonth] = useState("");
+  const [reportWorkOrder, setReportWorkOrder] = useState("all");
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
-  const paymentRows = useMemo(() => {
-    if (activeTab !== "supplier" && activeTab !== "customer") return [];
+  const supplierRows = useMemo(
+    () =>
+      buildFinanceMilestones(contracts, "supplier").map((row) => ({
+        ...row,
+        convertedAmount: convertAmount(
+          row.amount,
+          row.currency,
+          displayCurrency,
+          settings.exchangeRates,
+        ),
+        convertedContractAmount: convertAmount(
+          row.contractAmount,
+          row.currency,
+          displayCurrency,
+          settings.exchangeRates,
+        ),
+      })),
+    [contracts, displayCurrency, settings.exchangeRates],
+  );
 
-    return buildFinanceMilestones(contracts, activeTab).map((row) => ({
-      ...row,
-      convertedAmount: convertAmount(
-        row.amount,
-        row.currency,
-        displayCurrency,
-        settings.exchangeRates,
-      ),
-      convertedContractAmount: convertAmount(
-        row.contractAmount,
-        row.currency,
-        displayCurrency,
-        settings.exchangeRates,
-      ),
-    }));
-  }, [activeTab, contracts, displayCurrency, settings.exchangeRates]);
+  const customerRows = useMemo(
+    () =>
+      buildFinanceMilestones(contracts, "customer").map((row) => ({
+        ...row,
+        convertedAmount: convertAmount(
+          row.amount,
+          row.currency,
+          displayCurrency,
+          settings.exchangeRates,
+        ),
+        convertedContractAmount: convertAmount(
+          row.contractAmount,
+          row.currency,
+          displayCurrency,
+          settings.exchangeRates,
+        ),
+      })),
+    [contracts, displayCurrency, settings.exchangeRates],
+  );
+
+  const paymentRows = useMemo(() => {
+    if (activeTab === "supplier") return supplierRows;
+    if (activeTab === "customer") return customerRows;
+
+    return [];
+  }, [activeTab, customerRows, supplierRows]);
 
   const expenseRows = useMemo(
     () =>
@@ -72,6 +109,38 @@ function Finance() {
         ),
       })),
     [displayCurrency, settings.exchangeRates],
+  );
+
+  const analysisWorkOrders = useMemo(
+    () =>
+      [
+        ...new Set(
+          [...customerRows, ...supplierRows, ...expenseRows]
+            .map((row) => row.workOrder)
+            .filter(Boolean),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "tr", { numeric: true })),
+    [customerRows, expenseRows, supplierRows],
+  );
+
+  const analysisReport = useMemo(
+    () =>
+      buildFinancialAnalysis({
+        customerRows,
+        supplierRows,
+        expenseRows,
+        mode: reportMode,
+        workOrder: reportWorkOrder,
+        month: reportMonth,
+      }),
+    [
+      customerRows,
+      expenseRows,
+      reportMode,
+      reportMonth,
+      reportWorkOrder,
+      supplierRows,
+    ],
   );
 
   const companies = useMemo(
@@ -313,6 +382,19 @@ function Finance() {
   const transactionLabel =
     activeTab === "customer" ? "Tahsilat" : "Ödeme";
   const activeStats = expenseModule ? expenseStats : paymentStats;
+  const analysisTotals = analysisReport.totals;
+  const profitState =
+    analysisTotals.totalProfit > 0
+      ? "positive"
+      : analysisTotals.totalProfit < 0
+        ? "negative"
+        : "neutral";
+  const reportDescription =
+    reportMode === "project" && reportWorkOrder !== "all"
+      ? `${reportWorkOrder} iş emri analiz ediliyor.`
+      : reportMode === "monthly" && reportMonth
+        ? `${reportMonth} dönemi analiz ediliyor.`
+        : "Sistemdeki tüm kayıtlar kümülatif olarak analiz ediliyor.";
 
   return (
     <>
@@ -628,7 +710,245 @@ function Finance() {
         )}
 
         {activeTab === "analysis" && (
-          <p>Finansal analiz bölümü eklenecek.</p>
+          <div className="analysis-module">
+            <div className="analysis-header">
+              <div>
+                <h2>Finansal Analiz</h2>
+                <p>
+                  Tüm değerler seçilen kura göre çevrilerek kümülatif,
+                  aylık veya iş emri bazlı hesaplanır.
+                </p>
+              </div>
+
+              <div className="view-mode-switch" aria-label="Rapor görünümü">
+                {Object.entries(ANALYSIS_MODES).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={reportMode === key ? "active" : ""}
+                    onClick={() => setReportMode(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="finance-filters">
+              {reportMode === "project" && (
+                <label>
+                  <span>İş Emri Seç</span>
+                  <select
+                    value={reportWorkOrder}
+                    onChange={(event) =>
+                      setReportWorkOrder(event.target.value)
+                    }
+                  >
+                    <option value="all">Tümü</option>
+                    {analysisWorkOrders.map((workOrder) => (
+                      <option key={workOrder} value={workOrder}>
+                        {workOrder}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {reportMode === "monthly" && (
+                <label>
+                  <span>Ay Seçin</span>
+                  <input
+                    type="month"
+                    value={reportMonth}
+                    onChange={(event) => setReportMonth(event.target.value)}
+                  />
+                </label>
+              )}
+
+              <label>
+                <span>Gösterim Kuru</span>
+                <select
+                  value={displayCurrency}
+                  onChange={(event) => setDisplayCurrency(event.target.value)}
+                >
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="TRY">TRY</option>
+                </select>
+              </label>
+
+              <p className="analysis-filter-note">{reportDescription}</p>
+            </div>
+
+            <div className="analysis-summary-grid">
+              <div className="analysis-card income">
+                <h3>Gelir (Müşteri)</h3>
+                <div>
+                  <span>Tahsil Edilen</span>
+                  <strong>
+                    {formatMoney(analysisTotals.paidIncome, displayCurrency)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Bekleyen (Alacak)</span>
+                  <strong>
+                    {formatMoney(
+                      analysisTotals.pendingIncome,
+                      displayCurrency,
+                    )}
+                  </strong>
+                </div>
+                <footer>
+                  <span>Toplam</span>
+                  <strong>
+                    {formatMoney(analysisTotals.totalIncome, displayCurrency)}
+                  </strong>
+                </footer>
+              </div>
+
+              <div className="analysis-card expense">
+                <h3>Gider (Tedarikçi + Fatura)</h3>
+                <div>
+                  <span>Ödenen</span>
+                  <strong>
+                    {formatMoney(analysisTotals.paidExpense, displayCurrency)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Bekleyen (Borç)</span>
+                  <strong>
+                    {formatMoney(
+                      analysisTotals.pendingExpense,
+                      displayCurrency,
+                    )}
+                  </strong>
+                </div>
+                <footer>
+                  <span>Toplam</span>
+                  <strong>
+                    {formatMoney(analysisTotals.totalExpense, displayCurrency)}
+                  </strong>
+                </footer>
+              </div>
+
+              <div className={`analysis-card net ${profitState}`}>
+                <h3>Net Durum</h3>
+                <div>
+                  <span>Net Kasa (Reel)</span>
+                  <strong>
+                    {formatMoney(analysisTotals.realProfit, displayCurrency)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Bekleyen Net</span>
+                  <strong>
+                    {formatMoney(
+                      analysisTotals.pendingProfit,
+                      displayCurrency,
+                    )}
+                  </strong>
+                </div>
+                <footer>
+                  <span>Genel Net</span>
+                  <strong>
+                    {formatMoney(analysisTotals.totalProfit, displayCurrency)}
+                  </strong>
+                </footer>
+                <p>
+                  {analysisTotals.totalProfit < 0
+                    ? "Zarar (Genel)"
+                    : `%${analysisTotals.margin} Kâr Marjı (Genel)`}
+                </p>
+              </div>
+            </div>
+
+            <div className="analysis-detail-area">
+              <h3>Detaylı Kâr/Zarar Dökümü</h3>
+              <div className="analysis-detail-grid">
+                <div className="analysis-detail-card income">
+                  <div className="analysis-detail-title">
+                    <span>Gelirler (+)</span>
+                    <small>Müşteri Sözleşmeleri</small>
+                  </div>
+                  <div className="analysis-table-wrap">
+                    <table className="analysis-table">
+                      <thead>
+                        <tr>
+                          <th>İş Emri</th>
+                          <th>Tarih / Açıklama</th>
+                          <th>Tutar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analysisReport.incomeDetails.length === 0 ? (
+                          <tr>
+                            <td colSpan="3" className="empty-analysis-row">
+                              Gelir kaydı bulunamadı.
+                            </td>
+                          </tr>
+                        ) : (
+                          analysisReport.incomeDetails.map((detail) => (
+                            <tr key={detail.id}>
+                              <td>{detail.workOrder}</td>
+                              <td>
+                                <strong>{detail.date}</strong>
+                                <span>{detail.description}</span>
+                                <small>{detail.type}</small>
+                              </td>
+                              <td>
+                                {formatMoney(detail.income, displayCurrency)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="analysis-detail-card expense">
+                  <div className="analysis-detail-title">
+                    <span>Giderler (-)</span>
+                    <small>Tedarikçi + Ek Gider</small>
+                  </div>
+                  <div className="analysis-table-wrap">
+                    <table className="analysis-table">
+                      <thead>
+                        <tr>
+                          <th>İş Emri</th>
+                          <th>Tarih / Açıklama</th>
+                          <th>Tutar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analysisReport.expenseDetails.length === 0 ? (
+                          <tr>
+                            <td colSpan="3" className="empty-analysis-row">
+                              Gider kaydı bulunamadı.
+                            </td>
+                          </tr>
+                        ) : (
+                          analysisReport.expenseDetails.map((detail) => (
+                            <tr key={detail.id}>
+                              <td>{detail.workOrder}</td>
+                              <td>
+                                <strong>{detail.date}</strong>
+                                <span>{detail.description}</span>
+                                <small>{detail.type}</small>
+                              </td>
+                              <td>
+                                {formatMoney(detail.expense, displayCurrency)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       <Drawer

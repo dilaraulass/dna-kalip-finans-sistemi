@@ -293,9 +293,253 @@
   background: #fff1f2;
 }
 
+.analysis-module {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.analysis-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.analysis-header h2 {
+  margin: 0;
+}
+
+.analysis-header p,
+.analysis-filter-note {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.analysis-filter-note {
+  align-self: center;
+  font-style: italic;
+}
+
+.analysis-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.analysis-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 235px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.analysis-card h3 {
+  margin: 0 0 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid currentColor;
+  font-size: 13px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.analysis-card div,
+.analysis-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.analysis-card span {
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.analysis-card strong {
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.analysis-card footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid currentColor;
+}
+
+.analysis-card footer strong {
+  font-size: 24px;
+}
+
+.analysis-card.income {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #047857;
+}
+
+.analysis-card.expense {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.analysis-card.net {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.analysis-card.net.positive footer strong,
+.analysis-card.net.positive p {
+  color: #34d399;
+}
+
+.analysis-card.net.negative footer strong,
+.analysis-card.net.negative p {
+  color: #fb7185;
+}
+
+.analysis-card.net p {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analysis-detail-area {
+  padding-top: 22px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.analysis-detail-area > h3 {
+  margin: 0 0 16px;
+}
+
+.analysis-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.analysis-detail-card {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.analysis-detail-card.income {
+  border-color: #bbf7d0;
+}
+
+.analysis-detail-card.expense {
+  border-color: #fecdd3;
+}
+
+.analysis-detail-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  font-weight: 800;
+}
+
+.analysis-detail-card.income .analysis-detail-title {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.analysis-detail-card.expense .analysis-detail-title {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.analysis-detail-title small {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.analysis-table-wrap {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.analysis-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 11px 12px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  color: #64748b;
+  text-align: left;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.analysis-table th:last-child,
+.analysis-table td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.analysis-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.analysis-table td:first-child {
+  width: 90px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.analysis-table td span,
+.analysis-table td small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.analysis-table td small {
+  font-size: 11px;
+}
+
+.empty-analysis-row {
+  padding: 28px 12px !important;
+  color: #94a3b8;
+  text-align: center !important;
+  font-style: italic;
+}
+
 @media (max-width: 1200px) {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-summary-grid,
+  .analysis-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -320,5 +564,20 @@
   .clear-filter-btn {
     width: 100%;
     min-width: 0;
+  }
+
+  .analysis-header {
+    flex-direction: column;
+  }
+
+  .analysis-header .view-mode-switch {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .analysis-card div,
+  .analysis-card footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
