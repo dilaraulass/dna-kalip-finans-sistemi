@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DnaKalip.Api/DnaKalip.Api.csproj" />
+  </Folder>
+</Solution>
