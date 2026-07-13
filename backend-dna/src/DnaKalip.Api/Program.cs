@@ -1,4 +1,5 @@
 using DnaKalip.Api.Data;
+using DnaKalip.Api.Services.Development;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,12 +10,26 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<DnaKalipDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<JsonSeedService>();
+}
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapPost("/api/dev/seed-from-json", async (
+        JsonSeedService seedService,
+        CancellationToken cancellationToken) =>
+    {
+        var result = await seedService.SeedFromJsonAsync(cancellationToken);
+
+        return Results.Ok(result);
+    })
+    .WithName("SeedFromJson");
 }
 
 app.UseHttpsRedirection();
