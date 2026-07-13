@@ -1,8 +1,15 @@
 using DnaKalip.Api.Data;
+using DnaKalip.Api.Endpoints;
 using DnaKalip.Api.Services.Development;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+}
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -32,7 +39,10 @@ if (app.Environment.IsDevelopment())
     .WithName("SeedFromJson");
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.MapGet("/health", () => Results.Ok(new
 {
@@ -41,5 +51,7 @@ app.MapGet("/health", () => Results.Ok(new
     timestamp = DateTimeOffset.UtcNow,
 }))
 .WithName("GetHealth");
+
+app.MapContractsEndpoints();
 
 app.Run();
