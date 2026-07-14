@@ -1,0 +1,25 @@
+namespace DnaKalip.Api.Dtos.Contracts;
+
+public sealed record CreateContractRequest(
+    string ContractNumber,
+    string FinanceTab,
+    string? ContractType,
+    int? ContractYear,
+    string? ContractNumberSuffix,
+    string? ProjectNumber,
+    DateOnly? ContractDate,
+    Guid? CompanyId,
+    string? CompanyName,
+    string? CompanyType,
+    string? TaxNumber,
+    string? Email,
+    string? Phone,
+    string? CustomerProject,
+    string? WorkOrderNumber,
+    string? ReferenceNumber,
+    string? PartName,
+    int? MoldCount,
+    decimal TotalAmount,
+    string Currency,
+    string? ExchangeRateType,
+    decimal? FixedExchangeRate);
