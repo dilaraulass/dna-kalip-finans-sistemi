@@ -37,6 +37,7 @@ public sealed record ContractDetailResponse(
     string Currency,
     string? ExchangeRateType,
     decimal? FixedExchangeRate,
+    string? FormDataJson,
     IReadOnlyCollection<ContractMilestoneResponse> Milestones);
 
 public sealed record CompanySummaryResponse(

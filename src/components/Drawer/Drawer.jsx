@@ -6,6 +6,7 @@ function Drawer({
   title,
   subtitle,
   width = 500,
+  hideHeader = false,
   children,
 }) {
   if (!isOpen) return null;
@@ -15,20 +16,33 @@ function Drawer({
       <aside
         className="drawer"
         style={{ width }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="drawer-header">
-          <div>
-            <h2>{title}</h2>
-            {subtitle && <p>{subtitle}</p>}
-          </div>
-
-          <button className="drawer-close" onClick={onClose}>
+        {hideHeader ? (
+          <button
+            className="drawer-close drawer-floating-close"
+            onClick={onClose}
+          >
             ×
           </button>
-        </div>
+        ) : (
+          <div className="drawer-header">
+            <div>
+              <h2>{title}</h2>
+              {subtitle && <p>{subtitle}</p>}
+            </div>
 
-        <div className="drawer-content">
+            <button className="drawer-close" onClick={onClose}>
+              ×
+            </button>
+          </div>
+        )}
+
+        <div
+          className={
+            hideHeader ? "drawer-content drawer-content-no-header" : "drawer-content"
+          }
+        >
           {children}
         </div>
       </aside>

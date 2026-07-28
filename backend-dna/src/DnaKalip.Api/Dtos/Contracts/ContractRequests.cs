@@ -22,4 +22,5 @@ public sealed record CreateContractRequest(
     decimal TotalAmount,
     string Currency,
     string? ExchangeRateType,
-    decimal? FixedExchangeRate);
+    decimal? FixedExchangeRate,
+    string? FormDataJson);

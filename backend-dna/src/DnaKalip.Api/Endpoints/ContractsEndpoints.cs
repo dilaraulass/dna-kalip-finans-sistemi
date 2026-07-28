@@ -146,6 +146,7 @@ public static class ContractsEndpoints
                 Currency = currency,
                 ExchangeRateType = NormalizeOptional(request.ExchangeRateType),
                 FixedExchangeRate = request.FixedExchangeRate,
+                FormDataJson = NormalizeOptional(request.FormDataJson),
             };
 
             db.Contracts.Add(contract);
@@ -198,6 +199,7 @@ public static class ContractsEndpoints
                 contract.Currency,
                 contract.ExchangeRateType,
                 contract.FixedExchangeRate,
+                contract.FormDataJson,
                 contract.Milestones
                     .OrderBy(milestone => milestone.SortOrder)
                     .Select(milestone => new ContractMilestoneResponse(

@@ -20,6 +20,7 @@ public class Contract
     public string Currency { get; set; } = "EUR";
     public string? ExchangeRateType { get; set; }
     public decimal? FixedExchangeRate { get; set; }
+    public string? FormDataJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Company? Company { get; set; }

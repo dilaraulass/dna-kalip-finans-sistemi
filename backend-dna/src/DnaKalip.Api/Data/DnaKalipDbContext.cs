@@ -42,6 +42,7 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
             entity.Property(contract => contract.Currency).HasMaxLength(3).IsRequired();
             entity.Property(contract => contract.ExchangeRateType).HasMaxLength(50);
             entity.Property(contract => contract.FixedExchangeRate).HasPrecision(18, 6);
+            entity.Property(contract => contract.FormDataJson).HasColumnType("nvarchar(max)");
 
             entity.HasIndex(contract => contract.ContractNumber).IsUnique();
             entity.HasIndex(contract => contract.WorkOrderNumber);
