@@ -49,3 +49,14 @@ export function createContract(payload, { signal } = {}) {
     signal,
   });
 }
+
+export function updateContract(id, payload, { signal } = {}) {
+  return request(`/contracts/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+}

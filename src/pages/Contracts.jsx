@@ -6,6 +6,7 @@ import {
   createContract,
   getContractById,
   getContracts,
+  updateContract,
 } from "../services/contractsApi";
 import logo from "../assets/logo.png";
 import "./Contracts.css";
@@ -363,6 +364,46 @@ function calculatePaymentAmount(totalAmount, rate, currency) {
   return formatMoney(amount, currency);
 }
 
+function getCustomerPaymentRateTotal(form) {
+  return [
+    form.customerPaymentRate1,
+    form.customerPaymentRate2,
+    form.customerPaymentRate3,
+    form.customerPaymentRate4,
+  ].reduce((sum, rate) => sum + (Number(rate) || 0), 0);
+}
+
+function buildContractPayload(form) {
+  const contractType = form.contractType.trim();
+  const contractSuffix = form.contractNumberSuffix.trim();
+  const generatedContractNumber =
+    form.financeTab === "tedarikci"
+      ? `DNA-26-${contractType}-${contractSuffix}`
+      : `DNA-${contractType}-${contractSuffix}`;
+
+  return {
+    contractNumber: form.contractNumber.trim() || generatedContractNumber,
+    financeTab: form.financeTab,
+    contractType,
+    contractNumberSuffix: contractSuffix,
+    companyName: form.companyName.trim(),
+    contractDate: form.contractDate || null,
+    projectNumber: form.projectNumber.trim() || null,
+    customerProject: form.customerProject.trim() || null,
+    workOrderNumber: form.workOrderNumber.trim() || null,
+    referenceNumber: form.referenceNumber.trim() || null,
+    partName: form.partName.trim() || null,
+    moldCount: Number(form.moldCount || 1),
+    totalAmount: parseAmount(form.totalAmount),
+    currency: form.currency,
+    exchangeRateType: form.exchangeRateType || null,
+    fixedExchangeRate: form.fixedExchangeRate
+      ? parseAmount(form.fixedExchangeRate)
+      : null,
+    formDataJson: JSON.stringify(form),
+  };
+}
+
 function ContractsPage() {
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -378,6 +419,10 @@ function ContractsPage() {
   const [createError, setCreateError] = useState("");
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [editForm, setEditForm] = useState(INITIAL_CONTRACT_FORM);
+  const [editError, setEditError] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -524,6 +569,8 @@ function ContractsPage() {
     setDetailError("");
     setDetailLoading(false);
     setPreviewDrawerOpen(false);
+    setEditDrawerOpen(false);
+    setEditError("");
   }
 
   function openCreateDrawer() {
@@ -547,9 +594,33 @@ function ContractsPage() {
     setPreviewDrawerOpen(false);
   }
 
+  function openEditDrawer() {
+    if (!selectedContract) return;
+
+    setEditForm(buildContractFormFromDetail(selectedContract));
+    setEditError("");
+    setPreviewDrawerOpen(false);
+    setEditDrawerOpen(true);
+  }
+
+  function closeEditDrawer() {
+    if (editSubmitting) return;
+
+    setEditDrawerOpen(false);
+    setEditError("");
+  }
+
   function handleCreateFormChange(event) {
     const { checked, name, type, value } = event.target;
     setCreateForm((currentForm) => ({
+      ...currentForm,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
+  function handleEditFormChange(event) {
+    const { checked, name, type, value } = event.target;
+    setEditForm((currentForm) => ({
       ...currentForm,
       [name]: type === "checkbox" ? checked : value,
     }));
@@ -559,12 +630,7 @@ function ContractsPage() {
     event.preventDefault();
     setCreateError("");
 
-    const customerPaymentRateTotal = [
-      createForm.customerPaymentRate1,
-      createForm.customerPaymentRate2,
-      createForm.customerPaymentRate3,
-      createForm.customerPaymentRate4,
-    ].reduce((sum, rate) => sum + (Number(rate) || 0), 0);
+    const customerPaymentRateTotal = getCustomerPaymentRateTotal(createForm);
 
     if (
       createForm.financeTab === "musteri" &&
@@ -578,35 +644,7 @@ function ContractsPage() {
 
     setCreateSubmitting(true);
 
-    const contractType = createForm.contractType.trim();
-    const contractSuffix = createForm.contractNumberSuffix.trim();
-    const generatedContractNumber =
-      createForm.financeTab === "tedarikci"
-        ? `DNA-26-${contractType}-${contractSuffix}`
-        : `DNA-${contractType}-${contractSuffix}`;
-
-    const payload = {
-      contractNumber:
-        createForm.contractNumber.trim() || generatedContractNumber,
-      financeTab: createForm.financeTab,
-      contractType,
-      contractNumberSuffix: contractSuffix,
-      companyName: createForm.companyName.trim(),
-      contractDate: createForm.contractDate || null,
-      projectNumber: createForm.projectNumber.trim() || null,
-      customerProject: createForm.customerProject.trim() || null,
-      workOrderNumber: createForm.workOrderNumber.trim() || null,
-      referenceNumber: createForm.referenceNumber.trim() || null,
-      partName: createForm.partName.trim() || null,
-      moldCount: Number(createForm.moldCount || 1),
-      totalAmount: Number(createForm.totalAmount || 0),
-      currency: createForm.currency,
-      exchangeRateType: createForm.exchangeRateType || null,
-      fixedExchangeRate: createForm.fixedExchangeRate
-        ? Number(createForm.fixedExchangeRate)
-        : null,
-      formDataJson: JSON.stringify(createForm),
-    };
+    const payload = buildContractPayload(createForm);
 
     try {
       const createdContract = await createContract(payload);
@@ -621,6 +659,44 @@ function ContractsPage() {
       setCreateError(requestError.message || "Sözleşme oluşturulamadı.");
     } finally {
       setCreateSubmitting(false);
+    }
+  }
+
+  async function handleEditSubmit(event) {
+    event.preventDefault();
+
+    if (!selectedContract) return;
+
+    setEditError("");
+
+    const customerPaymentRateTotal = getCustomerPaymentRateTotal(editForm);
+
+    if (
+      editForm.financeTab === "musteri" &&
+      customerPaymentRateTotal !== 100
+    ) {
+      setEditError(
+        `Ödeme oranları toplamı %100 olmalıdır. Şu an: %${customerPaymentRateTotal}`,
+      );
+      return;
+    }
+
+    setEditSubmitting(true);
+
+    const payload = buildContractPayload(editForm);
+
+    try {
+      const updatedContract = await updateContract(selectedContract.id, payload);
+      const refreshedContracts = await getContracts();
+
+      setContracts(refreshedContracts);
+      setSelectedContractId(updatedContract.id);
+      setSelectedContract(updatedContract);
+      setEditDrawerOpen(false);
+    } catch (requestError) {
+      setEditError(requestError.message || "Sözleşme güncellenemedi.");
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -751,6 +827,7 @@ function ContractsPage() {
           <ContractDetail
             contract={selectedContract}
             onPreview={openPreviewDrawer}
+            onEdit={openEditDrawer}
           />
         )}
       </Drawer>
@@ -770,6 +847,23 @@ function ContractsPage() {
       </Drawer>
 
       <Drawer
+        isOpen={editDrawerOpen}
+        onClose={closeEditDrawer}
+        width={980}
+        hideHeader
+      >
+        <CreateContractForm
+          form={editForm}
+          error={editError}
+          submitting={editSubmitting}
+          onChange={handleEditFormChange}
+          onSubmit={handleEditSubmit}
+          onCancel={closeEditDrawer}
+          submitLabel="Değişiklikleri Kaydet"
+        />
+      </Drawer>
+
+      <Drawer
         isOpen={createDrawerOpen}
         onClose={closeCreateDrawer}
         width={980}
@@ -782,6 +876,7 @@ function ContractsPage() {
           onChange={handleCreateFormChange}
           onSubmit={handleCreateSubmit}
           onCancel={closeCreateDrawer}
+          submitLabel="Sözleşme Oluştur"
         />
       </Drawer>
     </section>
@@ -796,6 +891,7 @@ function CreateContractForm({
   onSubmit,
   onCancel,
   readOnly = false,
+  submitLabel = "Sözleşme Oluştur",
 }) {
   const activeTemplate = CONTRACT_EDITOR_CONFIG[form.financeTab];
   const totalPages = form.financeTab === "tedarikci" ? 4 : 2;
@@ -1121,7 +1217,7 @@ function CreateContractForm({
             className="contracts-primary-btn"
             disabled={submitting}
           >
-            {submitting ? "Kaydediliyor..." : "Sözleşme Oluştur"}
+            {submitting ? "Kaydediliyor..." : submitLabel}
           </button>
         )}
       </div>
@@ -1938,10 +2034,13 @@ function EditableField({
   );
 }
 
-function ContractDetail({ contract, onPreview }) {
+function ContractDetail({ contract, onPreview, onEdit }) {
   return (
     <div className="contract-detail">
       <div className="contract-detail-actions">
+        <button type="button" className="contracts-secondary-btn" onClick={onEdit}>
+          Düzenle
+        </button>
         <button type="button" className="contracts-primary-btn" onClick={onPreview}>
           Sözleşme Önizle
         </button>

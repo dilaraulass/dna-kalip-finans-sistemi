@@ -161,6 +161,116 @@ public static class ContractsEndpoints
         })
         .WithName("CreateContract");
 
+        group.MapPut("/{id:guid}", async (
+            Guid id,
+            UpdateContractRequest request,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var validationErrors = ValidateUpdateContractRequest(request);
+
+            if (validationErrors.Count > 0)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            var contract = await db.Contracts
+                .FirstOrDefaultAsync(
+                    item => item.Id == id,
+                    cancellationToken);
+
+            if (contract is null)
+            {
+                return Results.NotFound();
+            }
+
+            var contractNumber = request.ContractNumber.Trim();
+            var financeTab = request.FinanceTab.Trim().ToLowerInvariant();
+            var currency = request.Currency.Trim().ToUpperInvariant();
+            var companyName = request.CompanyName?.Trim();
+
+            var contractNumberExists = await db.Contracts
+                .AnyAsync(
+                    item => item.Id != id && item.ContractNumber == contractNumber,
+                    cancellationToken);
+
+            if (contractNumberExists)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Bu sözleşme numarasıyla başka bir kayıt zaten var.",
+                });
+            }
+
+            Company? company = null;
+
+            if (request.CompanyId is not null)
+            {
+                company = await db.Companies
+                    .FirstOrDefaultAsync(
+                        item => item.Id == request.CompanyId,
+                        cancellationToken);
+
+                if (company is null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["companyId"] = ["Seçilen firma bulunamadı."],
+                    });
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(companyName))
+            {
+                company = await db.Companies
+                    .FirstOrDefaultAsync(
+                        item => item.Name == companyName,
+                        cancellationToken);
+
+                if (company is null)
+                {
+                    company = new Company
+                    {
+                        Name = companyName,
+                        CompanyType = NormalizeOptional(request.CompanyType) ?? financeTab,
+                        TaxNumber = NormalizeOptional(request.TaxNumber),
+                        Email = NormalizeOptional(request.Email),
+                        Phone = NormalizeOptional(request.Phone),
+                    };
+
+                    db.Companies.Add(company);
+                }
+            }
+
+            contract.ContractNumber = contractNumber;
+            contract.FinanceTab = financeTab;
+            contract.ContractType = NormalizeOptional(request.ContractType);
+            contract.ContractYear = request.ContractYear ?? contract.ContractYear;
+            contract.ContractNumberSuffix = NormalizeOptional(request.ContractNumberSuffix);
+            contract.ProjectNumber = NormalizeOptional(request.ProjectNumber);
+            contract.ContractDate = request.ContractDate;
+            contract.Company = company;
+            contract.CustomerProject = NormalizeOptional(request.CustomerProject);
+            contract.WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber);
+            contract.ReferenceNumber = NormalizeOptional(request.ReferenceNumber);
+            contract.PartName = NormalizeOptional(request.PartName);
+            contract.MoldCount = request.MoldCount ?? 1;
+            contract.TotalAmount = request.TotalAmount;
+            contract.Currency = currency;
+            contract.ExchangeRateType = NormalizeOptional(request.ExchangeRateType);
+            contract.FixedExchangeRate = request.FixedExchangeRate;
+            contract.FormDataJson = NormalizeOptional(request.FormDataJson);
+
+            await db.SaveChangesAsync(cancellationToken);
+
+            var updatedContract = await GetContractDetailAsync(
+                db,
+                contract.Id,
+                cancellationToken);
+
+            return Results.Ok(updatedContract);
+        })
+        .WithName("UpdateContract");
+
         return app;
     }
 
@@ -227,6 +337,52 @@ public static class ContractsEndpoints
 
     private static Dictionary<string, string[]> ValidateCreateContractRequest(
         CreateContractRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var financeTab = request.FinanceTab?.Trim().ToLowerInvariant();
+        var currency = request.Currency?.Trim().ToUpperInvariant();
+
+        AddErrorIf(
+            errors,
+            string.IsNullOrWhiteSpace(request.ContractNumber),
+            "contractNumber",
+            "Sözleşme numarası zorunludur.");
+
+        AddErrorIf(
+            errors,
+            financeTab is not ("musteri" or "tedarikci"),
+            "financeTab",
+            "Sözleşme türü musteri veya tedarikci olmalıdır.");
+
+        AddErrorIf(
+            errors,
+            request.CompanyId is null && string.IsNullOrWhiteSpace(request.CompanyName),
+            "company",
+            "Firma seçimi veya firma adı zorunludur.");
+
+        AddErrorIf(
+            errors,
+            currency is not ("TRY" or "EUR" or "USD"),
+            "currency",
+            "Para birimi TRY, EUR veya USD olmalıdır.");
+
+        AddErrorIf(
+            errors,
+            request.TotalAmount < 0,
+            "totalAmount",
+            "Sözleşme tutarı negatif olamaz.");
+
+        AddErrorIf(
+            errors,
+            request.MoldCount is not null && request.MoldCount < 1,
+            "moldCount",
+            "Kalıp sayısı en az 1 olmalıdır.");
+
+        return errors;
+    }
+
+    private static Dictionary<string, string[]> ValidateUpdateContractRequest(
+        UpdateContractRequest request)
     {
         var errors = new Dictionary<string, string[]>();
         var financeTab = request.FinanceTab?.Trim().ToLowerInvariant();
