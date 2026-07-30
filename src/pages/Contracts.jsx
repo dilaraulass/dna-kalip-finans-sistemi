@@ -84,7 +84,6 @@ const INITIAL_CONTRACT_FORM = {
   map0DeliveryDate: "",
   offToolDeliveryDate: "",
   sampleApprovalDate: "",
-  paymentPlanNote: "",
   supplierPaymentOption1: false,
   supplierPaymentOption2: false,
   supplierPaymentOption3: false,
@@ -115,8 +114,6 @@ const INITIAL_CONTRACT_FORM = {
   customerPaymentAmount4: "",
   customerPaymentCondition4: "Parça, Kalıp Onayı ve PPAP Onayı",
   customerPaymentDueDays4: "60",
-  warrantyPrintCount: "1000000",
-  penaltyRate: "5",
   annexTechnicalSpec: true,
   annexSpecialRequests: true,
   annexCustomerSpec: true,
@@ -895,6 +892,7 @@ function CreateContractForm({
 }) {
   const activeTemplate = CONTRACT_EDITOR_CONFIG[form.financeTab];
   const totalPages = form.financeTab === "tedarikci" ? 4 : 2;
+  const [partImageError, setPartImageError] = useState("");
 
   function changeContractType(financeTab) {
     if (readOnly) return;
@@ -913,14 +911,32 @@ function CreateContractForm({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      setPartImageError("Sadece görsel dosyası yükleyebilirsiniz.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setPartImageError("Görsel boyutu en fazla 2 MB olmalıdır.");
+      event.target.value = "";
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
+      setPartImageError("");
       onChange({
         target: {
           name: "partImage",
           value: reader.result || "",
         },
       });
+      event.target.value = "";
+    };
+    reader.onerror = () => {
+      setPartImageError("Görsel okunurken bir hata oluştu.");
+      event.target.value = "";
     };
     reader.readAsDataURL(file);
   }
@@ -1084,14 +1100,15 @@ function CreateContractForm({
                       <img src={form.partImage} alt="Parça Görseli" />
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setPartImageError("");
                           onChange({
                             target: {
                               name: "partImage",
                               value: "",
                             },
-                          })
-                        }
+                          });
+                        }}
                       >
                         ×
                       </button>
@@ -1111,6 +1128,11 @@ function CreateContractForm({
                     </label>
                   )}
                 </div>
+                {partImageError && (
+                  <div className="contract-document-image-error">
+                    {partImageError}
+                  </div>
+                )}
 
                 <label className="contract-document-textarea">
                   <span>

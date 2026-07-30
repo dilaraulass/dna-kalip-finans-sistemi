@@ -565,7 +565,19 @@ button.contracts-summary-card:hover {
 }
 
 .contract-document-image-placeholder input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.contract-document-image-error {
+  grid-column: 2;
+  margin-top: -6px;
+  color: #be123c;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .contract-document-textarea {
