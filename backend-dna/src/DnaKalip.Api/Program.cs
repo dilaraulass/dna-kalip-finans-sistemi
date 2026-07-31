@@ -1,5 +1,6 @@
 using DnaKalip.Api.Data;
 using DnaKalip.Api.Endpoints;
+using DnaKalip.Api.Services.Contracts;
 using DnaKalip.Api.Services.Development;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,7 @@ if (builder.Environment.IsDevelopment())
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<DnaKalipDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<ContractMilestoneSyncService>();
 
 if (builder.Environment.IsDevelopment())
 {

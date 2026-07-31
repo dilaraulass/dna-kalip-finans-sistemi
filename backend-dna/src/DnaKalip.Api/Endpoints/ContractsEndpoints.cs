@@ -1,6 +1,7 @@
 using DnaKalip.Api.Data;
 using DnaKalip.Api.Dtos.Contracts;
 using DnaKalip.Api.Entities;
+using DnaKalip.Api.Services.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace DnaKalip.Api.Endpoints;
@@ -61,6 +62,7 @@ public static class ContractsEndpoints
         group.MapPost(string.Empty, async (
             CreateContractRequest request,
             DnaKalipDbContext db,
+            ContractMilestoneSyncService milestoneSyncService,
             CancellationToken cancellationToken) =>
         {
             var validationErrors = ValidateCreateContractRequest(request);
@@ -149,6 +151,8 @@ public static class ContractsEndpoints
                 FormDataJson = NormalizeOptional(request.FormDataJson),
             };
 
+            milestoneSyncService.SyncFromFormData(contract);
+
             db.Contracts.Add(contract);
             await db.SaveChangesAsync(cancellationToken);
 
@@ -165,6 +169,7 @@ public static class ContractsEndpoints
             Guid id,
             UpdateContractRequest request,
             DnaKalipDbContext db,
+            ContractMilestoneSyncService milestoneSyncService,
             CancellationToken cancellationToken) =>
         {
             var validationErrors = ValidateUpdateContractRequest(request);
@@ -175,6 +180,8 @@ public static class ContractsEndpoints
             }
 
             var contract = await db.Contracts
+                .Include(item => item.Milestones)
+                .ThenInclude(milestone => milestone.PaymentTracking)
                 .FirstOrDefaultAsync(
                     item => item.Id == id,
                     cancellationToken);
@@ -259,6 +266,8 @@ public static class ContractsEndpoints
             contract.ExchangeRateType = NormalizeOptional(request.ExchangeRateType);
             contract.FixedExchangeRate = request.FixedExchangeRate;
             contract.FormDataJson = NormalizeOptional(request.FormDataJson);
+
+            milestoneSyncService.SyncFromFormData(contract);
 
             await db.SaveChangesAsync(cancellationToken);
 
