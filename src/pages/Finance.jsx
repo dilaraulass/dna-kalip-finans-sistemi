@@ -1,15 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  getContracts,
-  getExpenses,
-  getSettings,
-} from "../services/databaseService";
-import {
-  buildExpenseInvoices,
   buildFinancialAnalysis,
-  buildFinanceMilestones,
   convertAmount,
 } from "../services/financeService";
+import { getFinanceDashboard } from "../services/financeApi";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
 import ExpenseInvoiceTable from "../components/Finance/ExpenseInvoiceTable";
@@ -29,8 +23,13 @@ const STATUS_FILTERS = {
 };
 
 function Finance() {
-  const contracts = getContracts();
-  const settings = getSettings();
+  const [financeData, setFinanceData] = useState({
+    paymentMilestones: [],
+    expenseInvoices: [],
+    exchangeRates: { EUR: 1, USD: 1, TRY: 1 },
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("supplier");
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -46,44 +45,81 @@ function Finance() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadFinanceDashboard() {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await getFinanceDashboard({ signal: controller.signal });
+        setFinanceData({
+          paymentMilestones: data.paymentMilestones || [],
+          expenseInvoices: data.expenseInvoices || [],
+          exchangeRates: data.exchangeRates || { EUR: 1, USD: 1, TRY: 1 },
+        });
+      } catch (requestError) {
+        if (requestError.name !== "AbortError") {
+          setError("Finans verileri yüklenirken bir hata oluştu.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadFinanceDashboard();
+
+    return () => controller.abort();
+  }, []);
+
   const supplierRows = useMemo(
     () =>
-      buildFinanceMilestones(contracts, "supplier").map((row) => ({
-        ...row,
-        convertedAmount: convertAmount(
-          row.amount,
-          row.currency,
-          displayCurrency,
-          settings.exchangeRates,
-        ),
-        convertedContractAmount: convertAmount(
-          row.contractAmount,
-          row.currency,
-          displayCurrency,
-          settings.exchangeRates,
-        ),
-      })),
-    [contracts, displayCurrency, settings.exchangeRates],
+      financeData.paymentMilestones
+        .filter((row) => row.financeTab === "tedarikci")
+        .map((row) => ({
+          ...row,
+          convertedAmount: convertAmount(
+            row.amount,
+            row.currency,
+            displayCurrency,
+            financeData.exchangeRates,
+            row,
+          ),
+          convertedContractAmount: convertAmount(
+            row.contractAmount,
+            row.contractCurrency,
+            displayCurrency,
+            financeData.exchangeRates,
+            row,
+          ),
+        })),
+    [displayCurrency, financeData],
   );
 
   const customerRows = useMemo(
     () =>
-      buildFinanceMilestones(contracts, "customer").map((row) => ({
-        ...row,
-        convertedAmount: convertAmount(
-          row.amount,
-          row.currency,
-          displayCurrency,
-          settings.exchangeRates,
-        ),
-        convertedContractAmount: convertAmount(
-          row.contractAmount,
-          row.currency,
-          displayCurrency,
-          settings.exchangeRates,
-        ),
-      })),
-    [contracts, displayCurrency, settings.exchangeRates],
+      financeData.paymentMilestones
+        .filter((row) => row.financeTab === "musteri")
+        .map((row) => ({
+          ...row,
+          convertedAmount: convertAmount(
+            row.amount,
+            row.currency,
+            displayCurrency,
+            financeData.exchangeRates,
+            row,
+          ),
+          convertedContractAmount: convertAmount(
+            row.contractAmount,
+            row.contractCurrency,
+            displayCurrency,
+            financeData.exchangeRates,
+            row,
+          ),
+        })),
+    [displayCurrency, financeData],
   );
 
   const paymentRows = useMemo(() => {
@@ -95,16 +131,16 @@ function Finance() {
 
   const expenseRows = useMemo(
     () =>
-      buildExpenseInvoices(getExpenses()).map((row) => ({
+      financeData.expenseInvoices.map((row) => ({
         ...row,
         convertedAmount: convertAmount(
           row.amount,
           row.currency,
           displayCurrency,
-          settings.exchangeRates,
+          financeData.exchangeRates,
         ),
       })),
-    [displayCurrency, settings.exchangeRates],
+    [displayCurrency, financeData],
   );
 
   const analysisWorkOrders = useMemo(
@@ -310,7 +346,15 @@ function Finance() {
         onTabChange={changePaymentModule}
       />
 
-      {(paymentModule || expenseModule) && (
+      {loading && (
+        <div className="finance-status">Finans verileri yükleniyor...</div>
+      )}
+
+      {!loading && error && (
+        <div className="finance-status error">{error}</div>
+      )}
+
+      {!loading && !error && (paymentModule || expenseModule) && (
         <FinanceStatusCards
           statusFilters={STATUS_FILTERS}
           statusFilter={statusFilter}
@@ -322,69 +366,71 @@ function Finance() {
         />
       )}
 
-      <div className="dashboard-section">
-        {paymentModule && (
-          <PaymentMilestoneTable
-            activeTab={activeTab}
-            rows={filteredRows}
-            companies={companies}
-            companyLabel={companyLabel}
-            companyFilter={companyFilter}
-            setCompanyFilter={setCompanyFilter}
-            dateStart={dateStart}
-            setDateStart={setDateStart}
-            dateEnd={dateEnd}
-            setDateEnd={setDateEnd}
-            displayCurrency={displayCurrency}
-            setDisplayCurrency={setDisplayCurrency}
-            setStatusFilter={setStatusFilter}
-            searchText={searchText}
-            setSearchText={setSearchText}
-            selectedRowId={selectedRowId}
-            setSelectedRow={setSelectedRow}
-            setSelectedRowId={setSelectedRowId}
-          />
-        )}
-        {activeTab === "expenses" && (
-          <ExpenseInvoiceTable
-            rows={filteredExpenseRows}
-            expenseCompanies={expenseCompanies}
-            expenseWorkOrders={expenseWorkOrders}
-            companyFilter={companyFilter}
-            setCompanyFilter={setCompanyFilter}
-            workOrderFilter={workOrderFilter}
-            setWorkOrderFilter={setWorkOrderFilter}
-            dateStart={dateStart}
-            setDateStart={setDateStart}
-            dateEnd={dateEnd}
-            setDateEnd={setDateEnd}
-            displayCurrency={displayCurrency}
-            setDisplayCurrency={setDisplayCurrency}
-            setStatusFilter={setStatusFilter}
-            searchText={searchText}
-            setSearchText={setSearchText}
-            expenseViewMode={expenseViewMode}
-            setExpenseViewMode={setExpenseViewMode}
-            selectedRowId={selectedRowId}
-            setSelectedRow={setSelectedRow}
-            setSelectedRowId={setSelectedRowId}
-          />
-        )}
-        {activeTab === "analysis" && (
-          <FinancialAnalysis
-            analysisReport={analysisReport}
-            analysisWorkOrders={analysisWorkOrders}
-            reportMode={reportMode}
-            setReportMode={setReportMode}
-            reportMonth={reportMonth}
-            setReportMonth={setReportMonth}
-            reportWorkOrder={reportWorkOrder}
-            setReportWorkOrder={setReportWorkOrder}
-            displayCurrency={displayCurrency}
-            setDisplayCurrency={setDisplayCurrency}
-          />
-        )}
-      </div>
+      {!loading && !error && (
+        <div className="dashboard-section">
+          {paymentModule && (
+            <PaymentMilestoneTable
+              activeTab={activeTab}
+              rows={filteredRows}
+              companies={companies}
+              companyLabel={companyLabel}
+              companyFilter={companyFilter}
+              setCompanyFilter={setCompanyFilter}
+              dateStart={dateStart}
+              setDateStart={setDateStart}
+              dateEnd={dateEnd}
+              setDateEnd={setDateEnd}
+              displayCurrency={displayCurrency}
+              setDisplayCurrency={setDisplayCurrency}
+              setStatusFilter={setStatusFilter}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              selectedRowId={selectedRowId}
+              setSelectedRow={setSelectedRow}
+              setSelectedRowId={setSelectedRowId}
+            />
+          )}
+          {activeTab === "expenses" && (
+            <ExpenseInvoiceTable
+              rows={filteredExpenseRows}
+              expenseCompanies={expenseCompanies}
+              expenseWorkOrders={expenseWorkOrders}
+              companyFilter={companyFilter}
+              setCompanyFilter={setCompanyFilter}
+              workOrderFilter={workOrderFilter}
+              setWorkOrderFilter={setWorkOrderFilter}
+              dateStart={dateStart}
+              setDateStart={setDateStart}
+              dateEnd={dateEnd}
+              setDateEnd={setDateEnd}
+              displayCurrency={displayCurrency}
+              setDisplayCurrency={setDisplayCurrency}
+              setStatusFilter={setStatusFilter}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              expenseViewMode={expenseViewMode}
+              setExpenseViewMode={setExpenseViewMode}
+              selectedRowId={selectedRowId}
+              setSelectedRow={setSelectedRow}
+              setSelectedRowId={setSelectedRowId}
+            />
+          )}
+          {activeTab === "analysis" && (
+            <FinancialAnalysis
+              analysisReport={analysisReport}
+              analysisWorkOrders={analysisWorkOrders}
+              reportMode={reportMode}
+              setReportMode={setReportMode}
+              reportMonth={reportMonth}
+              setReportMonth={setReportMonth}
+              reportWorkOrder={reportWorkOrder}
+              setReportWorkOrder={setReportWorkOrder}
+              displayCurrency={displayCurrency}
+              setDisplayCurrency={setDisplayCurrency}
+            />
+          )}
+        </div>
+      )}
       <Drawer
         isOpen={!!selectedRow}
         onClose={() => setSelectedRow(null)}

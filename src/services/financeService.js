@@ -503,12 +503,55 @@ export function buildFinancialAnalysis({
   };
 }
 
-export function convertAmount(amount, fromCurrency, toCurrency, rates) {
+function normalizeCurrency(currency) {
+  if (!currency) return "";
+
+  const normalizedCurrency = String(currency).trim().toUpperCase();
+
+  return normalizedCurrency === "TL" ? "TRY" : normalizedCurrency;
+}
+
+function normalizeExchangeRateType(exchangeRateType) {
+  const normalizedType = String(exchangeRateType || "").trim().toLowerCase();
+
+  if (normalizedType === "sabit") return "fixed";
+  if (normalizedType === "guncel" || normalizedType === "güncel") {
+    return "current";
+  }
+
+  return normalizedType;
+}
+
+function getEffectiveRates(rates, options = {}) {
+  const effectiveRates = { EUR: 1, USD: 1, TRY: 1, ...rates };
+  const exchangeRateType = normalizeExchangeRateType(options.exchangeRateType);
+  const fixedExchangeRate = extractAmount(options.fixedExchangeRate);
+  const contractCurrency = normalizeCurrency(options.contractCurrency);
+
+  if (
+    exchangeRateType === "fixed" &&
+    fixedExchangeRate > 0 &&
+    contractCurrency &&
+    contractCurrency !== "TRY"
+  ) {
+    effectiveRates[contractCurrency] = fixedExchangeRate;
+  }
+
+  return effectiveRates;
+}
+
+export function convertAmount(
+  amount,
+  fromCurrency,
+  toCurrency,
+  rates,
+  options = {},
+) {
   if (!amount || fromCurrency === toCurrency) return amount || 0;
 
-  const normalizedFrom = fromCurrency === "TL" ? "TRY" : fromCurrency;
-  const normalizedTo = toCurrency === "TL" ? "TRY" : toCurrency;
-  const safeRates = { EUR: 1, USD: 1, TRY: 1, ...rates };
+  const normalizedFrom = normalizeCurrency(fromCurrency);
+  const normalizedTo = normalizeCurrency(toCurrency);
+  const safeRates = getEffectiveRates(rates, options);
   const valueInTry =
     normalizedFrom === "TRY"
       ? amount

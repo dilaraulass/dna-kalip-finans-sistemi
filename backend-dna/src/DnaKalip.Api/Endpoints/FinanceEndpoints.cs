@@ -1,0 +1,248 @@
+using DnaKalip.Api.Data;
+using DnaKalip.Api.Dtos.Finance;
+using Microsoft.EntityFrameworkCore;
+
+namespace DnaKalip.Api.Endpoints;
+
+public static class FinanceEndpoints
+{
+    private const int ApproachingDueDays = 14;
+
+    public static IEndpointRouteBuilder MapFinanceEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/finance")
+            .WithTags("Finance");
+
+        group.MapGet("/dashboard", async (
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var paymentMilestones = await db.ContractMilestones
+                .AsNoTracking()
+                .OrderBy(milestone => milestone.Contract.ContractDate)
+                .ThenBy(milestone => milestone.Contract.ContractNumber)
+                .ThenBy(milestone => milestone.SortOrder)
+                .Select(milestone => new
+                {
+                    milestone.Id,
+                    milestone.ContractId,
+                    milestone.TrackingKey,
+                    milestone.MilestoneIndex,
+                    milestone.Condition,
+                    milestone.SubMilestoneName,
+                    milestone.Rate,
+                    milestone.Amount,
+                    milestone.DueDays,
+                    ContractNumber = milestone.Contract.ContractNumber,
+                    FinanceTab = milestone.Contract.FinanceTab,
+                    Company = milestone.Contract.Company == null
+                        ? "-"
+                        : milestone.Contract.Company.Name,
+                    WorkOrder = milestone.Contract.WorkOrderNumber,
+                    ReferenceNumber = milestone.Contract.ReferenceNumber,
+                    ContractDate = milestone.Contract.ContractDate,
+                    ContractAmount = milestone.Contract.TotalAmount,
+                    ContractCurrency = milestone.Contract.Currency,
+                    ExchangeRateType = milestone.Contract.ExchangeRateType,
+                    FixedExchangeRate = milestone.Contract.FixedExchangeRate,
+                    PaymentTracking = milestone.PaymentTracking == null
+                        ? null
+                        : new
+                        {
+                            milestone.PaymentTracking.ApprovalDate,
+                            milestone.PaymentTracking.PaymentDate,
+                            milestone.PaymentTracking.Status,
+                            milestone.PaymentTracking.DueDaysOverride,
+                        },
+                })
+                .ToListAsync(cancellationToken);
+
+            var paymentResponses = paymentMilestones
+                .Select(milestone =>
+                {
+                    var paymentStatus = milestone.PaymentTracking?.Status == "paid"
+                        ? "paid"
+                        : "pending";
+                    var activeDueDays = milestone.PaymentTracking?.DueDaysOverride
+                        ?? milestone.DueDays;
+                    var status = GetStatus(
+                        paymentStatus,
+                        milestone.PaymentTracking?.PaymentDate ??
+                            milestone.PaymentTracking?.ApprovalDate,
+                        today);
+
+                    return new FinancePaymentMilestoneResponse(
+                        milestone.Id,
+                        milestone.ContractId,
+                        milestone.TrackingKey,
+                        milestone.ContractNumber,
+                        milestone.FinanceTab,
+                        milestone.Company,
+                        NormalizeDisplayValue(milestone.WorkOrder),
+                        NormalizeDisplayValue(milestone.ReferenceNumber),
+                        milestone.ContractDate,
+                        milestone.ContractAmount,
+                        NormalizeCurrency(milestone.ContractCurrency),
+                        NormalizeCurrency(milestone.ContractCurrency),
+                        NormalizeExchangeRateType(milestone.ExchangeRateType),
+                        milestone.FixedExchangeRate,
+                        milestone.Rate,
+                        NormalizeDisplayValue(milestone.Condition),
+                        milestone.SubMilestoneName ?? string.Empty,
+                        milestone.Amount,
+                        milestone.DueDays,
+                        activeDueDays,
+                        milestone.PaymentTracking?.ApprovalDate,
+                        milestone.PaymentTracking?.PaymentDate,
+                        paymentStatus,
+                        status.StatusKey,
+                        status.Status,
+                        status.DaysUntilDue,
+                        milestone.MilestoneIndex);
+                })
+                .ToList();
+
+            var expenseInvoices = await db.ExpenseInvoices
+                .AsNoTracking()
+                .OrderBy(invoice => invoice.InvoiceDate)
+                .ThenBy(invoice => invoice.WorkOrderNumber)
+                .Select(invoice => new
+                {
+                    invoice.Id,
+                    invoice.WorkOrderNumber,
+                    invoice.InvoiceType,
+                    invoice.Description,
+                    invoice.Amount,
+                    invoice.Currency,
+                    invoice.InvoiceDate,
+                    invoice.DueDays,
+                    invoice.PaymentDate,
+                    invoice.Status,
+                })
+                .ToListAsync(cancellationToken);
+
+            var expenseResponses = expenseInvoices
+                .Select(invoice =>
+                {
+                    var paymentStatus = invoice.Status == "paid" ? "paid" : "pending";
+                    var expectedPaymentDate = invoice.InvoiceDate.AddDays(invoice.DueDays);
+                    var paymentDateDifference = invoice.PaymentDate.HasValue
+                        ? invoice.PaymentDate.Value.DayNumber - expectedPaymentDate.DayNumber
+                        : (int?)null;
+                    var status = GetStatus(
+                        paymentStatus,
+                        invoice.PaymentDate ?? expectedPaymentDate,
+                        today);
+
+                    return new FinanceExpenseInvoiceResponse(
+                        invoice.Id,
+                        NormalizeDisplayValue(invoice.WorkOrderNumber, "GENEL"),
+                        NormalizeDisplayValue(invoice.InvoiceType),
+                        invoice.Description,
+                        invoice.Amount,
+                        NormalizeCurrency(invoice.Currency),
+                        invoice.InvoiceDate,
+                        invoice.DueDays,
+                        invoice.PaymentDate,
+                        expectedPaymentDate,
+                        paymentDateDifference,
+                        paymentStatus,
+                        status.StatusKey,
+                        status.Status,
+                        status.DaysUntilDue);
+                })
+                .ToList();
+
+            var exchangeRateRows = await db.ExchangeRates
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+            var exchangeRates = exchangeRateRows
+                .GroupBy(rate => NormalizeCurrency(rate.Currency))
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderByDescending(rate => rate.EffectiveDate)
+                        .ThenByDescending(rate => rate.CreatedAt)
+                        .First()
+                        .RateToTry);
+
+            exchangeRates["TRY"] = 1;
+
+            return Results.Ok(new FinanceDashboardResponse(
+                paymentResponses,
+                expenseResponses,
+                exchangeRates));
+        })
+        .WithName("GetFinanceDashboard");
+
+        return app;
+    }
+
+    private static FinanceRowStatus GetStatus(
+        string paymentStatus,
+        DateOnly? targetDate,
+        DateOnly today)
+    {
+        if (paymentStatus == "paid")
+        {
+            return new FinanceRowStatus("paid", "Ödenen", null);
+        }
+
+        if (!targetDate.HasValue)
+        {
+            return new FinanceRowStatus("pending", "Bekleyen", null);
+        }
+
+        var daysUntilDue = targetDate.Value.DayNumber - today.DayNumber;
+
+        if (daysUntilDue < 0)
+        {
+            return new FinanceRowStatus("overdue", "Geciken", daysUntilDue);
+        }
+
+        if (daysUntilDue <= ApproachingDueDays)
+        {
+            return new FinanceRowStatus("approaching", "Yaklaşan", daysUntilDue);
+        }
+
+        return new FinanceRowStatus("pending", "Bekleyen", daysUntilDue);
+    }
+
+    private static string NormalizeCurrency(string? currency)
+    {
+        var normalizedCurrency = string.IsNullOrWhiteSpace(currency)
+            ? "TRY"
+            : currency.Trim().ToUpperInvariant();
+
+        return normalizedCurrency == "TL" ? "TRY" : normalizedCurrency;
+    }
+
+    private static string NormalizeExchangeRateType(string? exchangeRateType)
+    {
+        var normalizedType = string.IsNullOrWhiteSpace(exchangeRateType)
+            ? string.Empty
+            : exchangeRateType.Trim().ToLowerInvariant();
+
+        return normalizedType switch
+        {
+            "sabit" => "fixed",
+            "guncel" or "güncel" => "current",
+            _ => normalizedType,
+        };
+    }
+
+    private static string NormalizeDisplayValue(
+        string? value,
+        string fallback = "-")
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    }
+
+    private sealed record FinanceRowStatus(
+        string StatusKey,
+        string Status,
+        int? DaysUntilDue);
+}

@@ -110,6 +110,18 @@ test("convertAmount converts currencies through TRY", () => {
   assert.equal(convertAmount(5000, "TL", "EUR", rates), 100);
 });
 
+test("convertAmount uses contract fixed exchange rate when provided", () => {
+  const rates = { EUR: 50, USD: 40, TRY: 1 };
+  const options = {
+    exchangeRateType: "fixed",
+    fixedExchangeRate: 42,
+    contractCurrency: "EUR",
+  };
+
+  assert.equal(convertAmount(100, "EUR", "TRY", rates, options), 4200);
+  assert.equal(convertAmount(4200, "TRY", "EUR", rates, options), 100);
+});
+
 test("buildExpenseInvoices maps invoice fields and explicit paid status", () => {
   const invoices = buildExpenseInvoices([
     {
