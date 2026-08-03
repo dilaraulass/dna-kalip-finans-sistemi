@@ -1,3 +1,7 @@
+import {
+  ALL_FILTER_VALUE,
+  CURRENCY_OPTIONS,
+} from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 import ViewModeSwitch from "../ui/ViewModeSwitch";
 
@@ -27,7 +31,7 @@ function FinancialAnalysis({
         ? "negative"
         : "neutral";
   const reportDescription =
-    reportMode === "project" && reportWorkOrder !== "all"
+    reportMode === "project" && reportWorkOrder !== ALL_FILTER_VALUE
       ? `${reportWorkOrder} iş emri analiz ediliyor.`
       : reportMode === "monthly" && reportMonth
         ? `${reportMonth} dönemi analiz ediliyor.`
@@ -60,7 +64,7 @@ function FinancialAnalysis({
               value={reportWorkOrder}
               onChange={(event) => setReportWorkOrder(event.target.value)}
             >
-              <option value="all">Tümü</option>
+              <option value={ALL_FILTER_VALUE}>Tümü</option>
               {analysisWorkOrders.map((workOrder) => (
                 <option key={workOrder} value={workOrder}>
                   {workOrder}
@@ -87,9 +91,11 @@ function FinancialAnalysis({
             value={displayCurrency}
             onChange={(event) => setDisplayCurrency(event.target.value)}
           >
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-            <option value="TRY">TRY</option>
+            {CURRENCY_OPTIONS.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
           </select>
         </label>
 

@@ -1,3 +1,4 @@
+import { ALL_FILTER_VALUE } from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 
 function FinanceStatusCards({
@@ -21,7 +22,7 @@ function FinanceStatusCards({
           onClick={() => onStatusFilterChange(key)}
         >
           <h3>
-            {key === "all"
+            {key === ALL_FILTER_VALUE
               ? expenseModule
                 ? "Toplam Gider Faturası"
                 : `Toplam ${transactionLabel}`

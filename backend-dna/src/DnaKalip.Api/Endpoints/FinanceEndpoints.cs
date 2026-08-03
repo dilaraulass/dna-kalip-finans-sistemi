@@ -1,4 +1,5 @@
 using DnaKalip.Api.Data;
+using DnaKalip.Api.Domain;
 using DnaKalip.Api.Dtos.Finance;
 using DnaKalip.Api.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -63,9 +64,9 @@ public static class FinanceEndpoints
             var paymentResponses = paymentMilestones
                 .Select(milestone =>
                 {
-                    var paymentStatus = milestone.PaymentTracking?.Status == "paid"
-                        ? "paid"
-                        : "pending";
+                    var paymentStatus = milestone.PaymentTracking?.Status == PaymentStatuses.Paid
+                        ? PaymentStatuses.Paid
+                        : PaymentStatuses.Pending;
                     var activeDueDays = milestone.PaymentTracking?.DueDaysOverride
                         ?? milestone.DueDays;
                     var status = GetStatus(
@@ -127,7 +128,9 @@ public static class FinanceEndpoints
             var expenseResponses = expenseInvoices
                 .Select(invoice =>
                 {
-                    var paymentStatus = invoice.Status == "paid" ? "paid" : "pending";
+                    var paymentStatus = invoice.Status == PaymentStatuses.Paid
+                        ? PaymentStatuses.Paid
+                        : PaymentStatuses.Pending;
                     var expectedPaymentDate = invoice.InvoiceDate.AddDays(invoice.DueDays);
                     var paymentDateDifference = invoice.PaymentDate.HasValue
                         ? invoice.PaymentDate.Value.DayNumber - expectedPaymentDate.DayNumber
@@ -170,7 +173,7 @@ public static class FinanceEndpoints
                         .First()
                         .RateToTry);
 
-            exchangeRates["TRY"] = 1;
+            exchangeRates[Currencies.Try] = 1;
 
             return Results.Ok(new FinanceDashboardResponse(
                 paymentResponses,
@@ -278,7 +281,7 @@ public static class FinanceEndpoints
         var errors = new Dictionary<string, string[]>();
         var status = request.Status?.Trim().ToLowerInvariant();
 
-        if (status is not ("paid" or "pending"))
+        if (status is not (PaymentStatuses.Paid or PaymentStatuses.Pending))
         {
             errors["status"] = ["Durum paid veya pending olmalıdır."];
         }
@@ -308,7 +311,7 @@ public static class FinanceEndpoints
             errors["amount"] = ["Tutar negatif olamaz."];
         }
 
-        if (currency is not ("TRY" or "EUR" or "USD" or "TL"))
+        if (currency is not (Currencies.Try or Currencies.Eur or Currencies.Usd or Currencies.LegacyTry))
         {
             errors["currency"] = ["Para birimi TRY, EUR veya USD olmalıdır."];
         }
@@ -318,7 +321,7 @@ public static class FinanceEndpoints
             errors["dueDays"] = ["Vade negatif olamaz."];
         }
 
-        if (status is not ("paid" or "pending"))
+        if (status is not (PaymentStatuses.Paid or PaymentStatuses.Pending))
         {
             errors["status"] = ["Durum paid veya pending olmalıdır."];
         }
@@ -331,38 +334,55 @@ public static class FinanceEndpoints
         DateOnly? targetDate,
         DateOnly today)
     {
-        if (paymentStatus == "paid")
+        if (paymentStatus == PaymentStatuses.Paid)
         {
-            return new FinanceRowStatus("paid", "Ödenen", null);
+            return new FinanceRowStatus(
+                FinanceStatusKeys.Paid,
+                FinanceStatusLabels.Paid,
+                null);
         }
 
         if (!targetDate.HasValue)
         {
-            return new FinanceRowStatus("pending", "Bekleyen", null);
+            return new FinanceRowStatus(
+                FinanceStatusKeys.Pending,
+                FinanceStatusLabels.Pending,
+                null);
         }
 
         var daysUntilDue = targetDate.Value.DayNumber - today.DayNumber;
 
         if (daysUntilDue < 0)
         {
-            return new FinanceRowStatus("overdue", "Geciken", daysUntilDue);
+            return new FinanceRowStatus(
+                FinanceStatusKeys.Overdue,
+                FinanceStatusLabels.Overdue,
+                daysUntilDue);
         }
 
         if (daysUntilDue <= ApproachingDueDays)
         {
-            return new FinanceRowStatus("approaching", "Yaklaşan", daysUntilDue);
+            return new FinanceRowStatus(
+                FinanceStatusKeys.Approaching,
+                FinanceStatusLabels.Approaching,
+                daysUntilDue);
         }
 
-        return new FinanceRowStatus("pending", "Bekleyen", daysUntilDue);
+        return new FinanceRowStatus(
+            FinanceStatusKeys.Pending,
+            FinanceStatusLabels.Pending,
+            daysUntilDue);
     }
 
     private static string NormalizeCurrency(string? currency)
     {
         var normalizedCurrency = string.IsNullOrWhiteSpace(currency)
-            ? "TRY"
+            ? Currencies.Try
             : currency.Trim().ToUpperInvariant();
 
-        return normalizedCurrency == "TL" ? "TRY" : normalizedCurrency;
+        return normalizedCurrency == Currencies.LegacyTry
+            ? Currencies.Try
+            : normalizedCurrency;
     }
 
     private static string NormalizeExchangeRateType(string? exchangeRateType)
@@ -373,8 +393,9 @@ public static class FinanceEndpoints
 
         return normalizedType switch
         {
-            "sabit" => "fixed",
-            "guncel" or "güncel" => "current",
+            ExchangeRateTypes.FixedTurkish => ExchangeRateTypes.Fixed,
+            ExchangeRateTypes.CurrentTurkish or ExchangeRateTypes.CurrentTurkishWithAccent =>
+                ExchangeRateTypes.Current,
             _ => normalizedType,
         };
     }

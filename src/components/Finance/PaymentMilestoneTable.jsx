@@ -1,5 +1,10 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
+import {
+  ALL_FILTER_VALUE,
+  CURRENCY_OPTIONS,
+  FINANCE_MODULES,
+} from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 import StatusBadge from "../ui/StatusBadge";
 
@@ -27,7 +32,7 @@ function PaymentMilestoneTable({
     { field: "contractNumber", headerName: "Sözleşme No", width: 160 },
     {
       field: "company",
-      headerName: activeTab === "customer" ? "Müşteri" : "Tedarikçi",
+      headerName: activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi",
       width: 175,
     },
     { field: "workOrder", headerName: "İş Emri No", width: 115 },
@@ -75,7 +80,7 @@ function PaymentMilestoneTable({
       <div className="table-header">
         <div>
           <h2>
-            {activeTab === "customer"
+            {activeTab === FINANCE_MODULES.customer
               ? "Müşteri Tahsilatları"
               : "Tedarikçi Ödemeleri"}
           </h2>
@@ -98,7 +103,7 @@ function PaymentMilestoneTable({
             value={companyFilter}
             onChange={(event) => setCompanyFilter(event.target.value)}
           >
-            <option value="all">Tümü</option>
+            <option value={ALL_FILTER_VALUE}>Tümü</option>
             {companies.map((company) => (
               <option key={company} value={company}>
                 {company}
@@ -131,9 +136,11 @@ function PaymentMilestoneTable({
             value={displayCurrency}
             onChange={(event) => setDisplayCurrency(event.target.value)}
           >
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-            <option value="TRY">TRY</option>
+            {CURRENCY_OPTIONS.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -143,8 +150,8 @@ function PaymentMilestoneTable({
           onClick={() => {
             setDateStart("");
             setDateEnd("");
-            setCompanyFilter("all");
-            setStatusFilter("all");
+            setCompanyFilter(ALL_FILTER_VALUE);
+            setStatusFilter(ALL_FILTER_VALUE);
           }}
         >
           Filtreleri Temizle

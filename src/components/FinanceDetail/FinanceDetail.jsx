@@ -1,12 +1,16 @@
 import { useState } from "react";
 import "./FinanceDetail.css";
+import {
+  PAYMENT_STATUSES,
+  PAYMENT_STATUS_OPTIONS,
+} from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 
 function getInitialForm(selectedRow) {
   return {
     approvalDate: selectedRow?.approvalDate || "",
     paymentDate: selectedRow?.paymentDate || "",
-    status: selectedRow?.paymentStatus || "pending",
+    status: selectedRow?.paymentStatus || PAYMENT_STATUSES.pending,
     dueDays: String(selectedRow?.activeDueDays ?? ""),
   };
 }
@@ -160,8 +164,11 @@ function FinanceDetail({
           <label>
             <span>Durum</span>
             <select name="status" value={form.status} onChange={handleChange}>
-              <option value="pending">Bekleyen</option>
-              <option value="paid">Ödenen</option>
+              {PAYMENT_STATUS_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
           </label>
 

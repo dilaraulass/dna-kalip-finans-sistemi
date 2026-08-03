@@ -1,4 +1,5 @@
 using DnaKalip.Api.Data;
+using DnaKalip.Api.Domain;
 using DnaKalip.Api.Dtos.Contracts;
 using DnaKalip.Api.Entities;
 using DnaKalip.Api.Services.Contracts;
@@ -39,7 +40,7 @@ public static class ContractsEndpoints
                     contract.Milestones.Count,
                     contract.Milestones.Count(milestone =>
                         milestone.PaymentTracking != null &&
-                        milestone.PaymentTracking.Status == "paid")))
+                        milestone.PaymentTracking.Status == PaymentStatuses.Paid)))
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(contracts);
@@ -359,7 +360,7 @@ public static class ContractsEndpoints
 
         AddErrorIf(
             errors,
-            financeTab is not ("musteri" or "tedarikci"),
+            financeTab is not (FinanceTabs.Customer or FinanceTabs.Supplier),
             "financeTab",
             "Sözleşme türü musteri veya tedarikci olmalıdır.");
 
@@ -371,7 +372,7 @@ public static class ContractsEndpoints
 
         AddErrorIf(
             errors,
-            currency is not ("TRY" or "EUR" or "USD"),
+            currency is not (Currencies.Try or Currencies.Eur or Currencies.Usd),
             "currency",
             "Para birimi TRY, EUR veya USD olmalıdır.");
 
@@ -405,7 +406,7 @@ public static class ContractsEndpoints
 
         AddErrorIf(
             errors,
-            financeTab is not ("musteri" or "tedarikci"),
+            financeTab is not (FinanceTabs.Customer or FinanceTabs.Supplier),
             "financeTab",
             "Sözleşme türü musteri veya tedarikci olmalıdır.");
 
@@ -417,7 +418,7 @@ public static class ContractsEndpoints
 
         AddErrorIf(
             errors,
-            currency is not ("TRY" or "EUR" or "USD"),
+            currency is not (Currencies.Try or Currencies.Eur or Currencies.Usd),
             "currency",
             "Para birimi TRY, EUR veya USD olmalıdır.");
 

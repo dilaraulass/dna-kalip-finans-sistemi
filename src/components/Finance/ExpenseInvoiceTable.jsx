@@ -1,5 +1,9 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
+import {
+  ALL_FILTER_VALUE,
+  CURRENCY_OPTIONS,
+} from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 import StatusBadge from "../ui/StatusBadge";
 import ViewModeSwitch from "../ui/ViewModeSwitch";
@@ -83,7 +87,7 @@ function ExpenseInvoiceTable({
             value={companyFilter}
             onChange={(event) => setCompanyFilter(event.target.value)}
           >
-            <option value="all">Tümü</option>
+            <option value={ALL_FILTER_VALUE}>Tümü</option>
             {expenseCompanies.map((company) => (
               <option key={company} value={company}>
                 {company}
@@ -98,7 +102,7 @@ function ExpenseInvoiceTable({
             value={workOrderFilter}
             onChange={(event) => setWorkOrderFilter(event.target.value)}
           >
-            <option value="all">Tümü</option>
+            <option value={ALL_FILTER_VALUE}>Tümü</option>
             {expenseWorkOrders.map((workOrder) => (
               <option key={workOrder} value={workOrder}>
                 {workOrder}
@@ -131,9 +135,11 @@ function ExpenseInvoiceTable({
             value={displayCurrency}
             onChange={(event) => setDisplayCurrency(event.target.value)}
           >
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-            <option value="TRY">TRY</option>
+            {CURRENCY_OPTIONS.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -143,9 +149,9 @@ function ExpenseInvoiceTable({
           onClick={() => {
             setDateStart("");
             setDateEnd("");
-            setCompanyFilter("all");
-            setWorkOrderFilter("all");
-            setStatusFilter("all");
+            setCompanyFilter(ALL_FILTER_VALUE);
+            setWorkOrderFilter(ALL_FILTER_VALUE);
+            setStatusFilter(ALL_FILTER_VALUE);
           }}
         >
           Filtreleri Temizle

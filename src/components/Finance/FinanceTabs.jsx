@@ -1,14 +1,16 @@
-const FINANCE_TABS = [
-  { key: "supplier", label: "Tedarikçi Ödemeleri" },
-  { key: "customer", label: "Müşteri Tahsilatları" },
-  { key: "expenses", label: "Ek Gider Faturaları" },
-  { key: "analysis", label: "Finansal Analiz" },
+import { FINANCE_MODULES } from "../../constants/financeConstants";
+
+const FINANCE_TAB_OPTIONS = [
+  { key: FINANCE_MODULES.supplier, label: "Tedarikçi Ödemeleri" },
+  { key: FINANCE_MODULES.customer, label: "Müşteri Tahsilatları" },
+  { key: FINANCE_MODULES.expenses, label: "Ek Gider Faturaları" },
+  { key: FINANCE_MODULES.analysis, label: "Finansal Analiz" },
 ];
 
 function FinanceTabs({ activeTab, onTabChange }) {
   return (
     <div className="finance-tabs">
-      {FINANCE_TABS.map((tab) => (
+      {FINANCE_TAB_OPTIONS.map((tab) => (
         <button
           key={tab.key}
           className={activeTab === tab.key ? "active" : ""}

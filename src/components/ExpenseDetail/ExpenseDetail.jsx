@@ -1,18 +1,25 @@
 import { useState } from "react";
+import {
+  CURRENCIES,
+  CURRENCY_OPTIONS,
+  PAYMENT_STATUSES,
+  PAYMENT_STATUS_OPTIONS,
+} from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 import "../FinanceDetail/FinanceDetail.css";
 
 function getInitialForm(selectedRow) {
   return {
-    workOrderNumber: selectedRow?.workOrder === "GENEL" ? "" : selectedRow?.workOrder || "",
+    workOrderNumber:
+      selectedRow?.workOrder === "GENEL" ? "" : selectedRow?.workOrder || "",
     invoiceType: selectedRow?.invoiceType || "",
     description: selectedRow?.company || "",
     amount: String(selectedRow?.amount ?? ""),
-    currency: selectedRow?.currency || "TRY",
+    currency: selectedRow?.currency || CURRENCIES.try,
     invoiceDate: selectedRow?.invoiceDate || "",
     dueDays: String(selectedRow?.dueDays ?? ""),
     paymentDate: selectedRow?.paymentDate || "",
-    status: selectedRow?.paymentStatus || "pending",
+    status: selectedRow?.paymentStatus || PAYMENT_STATUSES.pending,
   };
 }
 
@@ -58,7 +65,7 @@ function ExpenseDetail({
         <span className={`status-badge ${selectedRow.statusKey}`}>
           {selectedRow.status}
           {selectedRow.daysUntilDue !== null &&
-            selectedRow.statusKey !== "paid" &&
+            selectedRow.statusKey !== PAYMENT_STATUSES.paid &&
             ` (${Math.abs(selectedRow.daysUntilDue)} gün)`}
         </span>
       </div>
@@ -184,9 +191,11 @@ function ExpenseDetail({
           <label>
             <span>Para Birimi</span>
             <select name="currency" value={form.currency} onChange={handleChange}>
-              <option value="TRY">TRY</option>
-              <option value="EUR">EUR</option>
-              <option value="USD">USD</option>
+              {CURRENCY_OPTIONS.map((currency) => (
+                <option key={currency} value={currency}>
+                  {currency}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -224,8 +233,11 @@ function ExpenseDetail({
           <label>
             <span>Durum</span>
             <select name="status" value={form.status} onChange={handleChange}>
-              <option value="pending">Bekleyen</option>
-              <option value="paid">Ödenen</option>
+              {PAYMENT_STATUS_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
           </label>
         </div>

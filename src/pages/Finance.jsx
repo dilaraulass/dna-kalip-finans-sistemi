@@ -17,37 +17,38 @@ import FinanceTabs from "../components/Finance/FinanceTabs";
 import PaymentMilestoneTable from "../components/Finance/PaymentMilestoneTable";
 import FinanceDetail from "../components/FinanceDetail/FinanceDetail";
 import ExpenseDetail from "../components/ExpenseDetail/ExpenseDetail";
-
-const STATUS_FILTERS = {
-  all: "Tümü",
-  paid: "Ödenen",
-  pending: "Bekleyen",
-  approaching: "Yaklaşan",
-  overdue: "Geciken",
-};
+import {
+  ALL_FILTER_VALUE,
+  DEFAULT_EXCHANGE_RATES,
+  CURRENCIES,
+  FINANCE_MODULES,
+  FINANCE_TABS,
+  STATUS_KEYS,
+  STATUS_FILTERS,
+} from "../constants/financeConstants";
 
 function Finance() {
   const [financeData, setFinanceData] = useState({
     paymentMilestones: [],
     expenseInvoices: [],
-    exchangeRates: { EUR: 1, USD: 1, TRY: 1 },
+    exchangeRates: DEFAULT_EXCHANGE_RATES,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [detailUpdateError, setDetailUpdateError] = useState("");
   const [detailUpdateSubmitting, setDetailUpdateSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState("supplier");
+  const [activeTab, setActiveTab] = useState(FINANCE_MODULES.supplier);
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
-  const [workOrderFilter, setWorkOrderFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(STATUS_KEYS.all);
+  const [companyFilter, setCompanyFilter] = useState(ALL_FILTER_VALUE);
+  const [workOrderFilter, setWorkOrderFilter] = useState(ALL_FILTER_VALUE);
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
-  const [displayCurrency, setDisplayCurrency] = useState("EUR");
+  const [displayCurrency, setDisplayCurrency] = useState(CURRENCIES.eur);
   const [expenseViewMode, setExpenseViewMode] = useState("grouped");
   const [reportMode, setReportMode] = useState("general");
   const [reportMonth, setReportMonth] = useState("");
-  const [reportWorkOrder, setReportWorkOrder] = useState("all");
+  const [reportWorkOrder, setReportWorkOrder] = useState(ALL_FILTER_VALUE);
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
@@ -61,7 +62,7 @@ function Finance() {
       setFinanceData({
         paymentMilestones: data.paymentMilestones || [],
         expenseInvoices: data.expenseInvoices || [],
-        exchangeRates: data.exchangeRates || { EUR: 1, USD: 1, TRY: 1 },
+        exchangeRates: data.exchangeRates || DEFAULT_EXCHANGE_RATES,
       });
     } catch (requestError) {
       if (requestError.name !== "AbortError") {
@@ -89,7 +90,7 @@ function Finance() {
   const supplierRows = useMemo(
     () =>
       financeData.paymentMilestones
-        .filter((row) => row.financeTab === "tedarikci")
+        .filter((row) => row.financeTab === FINANCE_TABS.supplier)
         .map((row) => ({
           ...row,
           convertedAmount: convertAmount(
@@ -113,7 +114,7 @@ function Finance() {
   const customerRows = useMemo(
     () =>
       financeData.paymentMilestones
-        .filter((row) => row.financeTab === "musteri")
+        .filter((row) => row.financeTab === FINANCE_TABS.customer)
         .map((row) => ({
           ...row,
           convertedAmount: convertAmount(
@@ -135,8 +136,8 @@ function Finance() {
   );
 
   const paymentRows = useMemo(() => {
-    if (activeTab === "supplier") return supplierRows;
-    if (activeTab === "customer") return customerRows;
+    if (activeTab === FINANCE_MODULES.supplier) return supplierRows;
+    if (activeTab === FINANCE_MODULES.customer) return customerRows;
 
     return [];
   }, [activeTab, customerRows, supplierRows]);
@@ -197,7 +198,7 @@ function Finance() {
 
   const companyRows = useMemo(
     () =>
-      companyFilter === "all"
+      companyFilter === ALL_FILTER_VALUE
         ? paymentRows
         : paymentRows.filter((row) => row.company === companyFilter),
     [companyFilter, paymentRows],
@@ -205,11 +206,11 @@ function Finance() {
 
   const paymentStats = useMemo(() => {
     const result = {
-      all: 0,
-      paid: 0,
-      pending: 0,
-      approaching: 0,
-      overdue: 0,
+      [STATUS_KEYS.all]: 0,
+      [STATUS_KEYS.paid]: 0,
+      [STATUS_KEYS.pending]: 0,
+      [STATUS_KEYS.approaching]: 0,
+      [STATUS_KEYS.overdue]: 0,
     };
 
     companyRows.forEach((row) => {
@@ -221,7 +222,7 @@ function Finance() {
 
       if (!matchesDate) return;
 
-      result.all += row.convertedAmount;
+      result[STATUS_KEYS.all] += row.convertedAmount;
       result[row.statusKey] += row.convertedAmount;
     });
 
@@ -248,9 +249,9 @@ function Finance() {
     () =>
       expenseRows.filter((row) => {
         const matchesCompany =
-          companyFilter === "all" || row.company === companyFilter;
+          companyFilter === ALL_FILTER_VALUE || row.company === companyFilter;
         const matchesWorkOrder =
-          workOrderFilter === "all" || row.workOrder === workOrderFilter;
+          workOrderFilter === ALL_FILTER_VALUE || row.workOrder === workOrderFilter;
         const matchesDate =
           (!dateStart || row.invoiceDate >= dateStart) &&
           (!dateEnd || row.invoiceDate <= dateEnd);
@@ -268,15 +269,15 @@ function Finance() {
 
   const expenseStats = useMemo(() => {
     const result = {
-      all: 0,
-      paid: 0,
-      pending: 0,
-      approaching: 0,
-      overdue: 0,
+      [STATUS_KEYS.all]: 0,
+      [STATUS_KEYS.paid]: 0,
+      [STATUS_KEYS.pending]: 0,
+      [STATUS_KEYS.approaching]: 0,
+      [STATUS_KEYS.overdue]: 0,
     };
 
     expenseBaseRows.forEach((row) => {
-      result.all += row.convertedAmount;
+      result[STATUS_KEYS.all] += row.convertedAmount;
       result[row.statusKey] += row.convertedAmount;
     });
 
@@ -295,7 +296,7 @@ function Finance() {
       row.referenceNumber.toLocaleLowerCase("tr-TR").includes(search) ||
       row.milestoneCondition.toLocaleLowerCase("tr-TR").includes(search);
     const matchesStatus =
-      statusFilter === "all" || row.statusKey === statusFilter;
+      statusFilter === STATUS_KEYS.all || row.statusKey === statusFilter;
     const matchesDate =
       (!dateStart || (targetDate && targetDate >= dateStart)) &&
       (!dateEnd || (targetDate && targetDate <= dateEnd));
@@ -312,7 +313,7 @@ function Finance() {
         row.invoiceType.toLocaleLowerCase("tr-TR").includes(search) ||
         row.company.toLocaleLowerCase("tr-TR").includes(search);
       const matchesStatus =
-        statusFilter === "all" || row.statusKey === statusFilter;
+        statusFilter === STATUS_KEYS.all || row.statusKey === statusFilter;
 
       return matchesSearch && matchesStatus;
     })
@@ -335,9 +336,9 @@ function Finance() {
 
   const changePaymentModule = (module) => {
     setActiveTab(module);
-    setStatusFilter("all");
-    setCompanyFilter("all");
-    setWorkOrderFilter("all");
+    setStatusFilter(STATUS_KEYS.all);
+    setCompanyFilter(ALL_FILTER_VALUE);
+    setWorkOrderFilter(ALL_FILTER_VALUE);
     setSearchText("");
     setSelectedRow(null);
     setSelectedRowId(null);
@@ -383,11 +384,13 @@ function Finance() {
   }
 
   const paymentModule =
-    activeTab === "supplier" || activeTab === "customer";
-  const expenseModule = activeTab === "expenses";
-  const companyLabel = activeTab === "customer" ? "Müşteri" : "Tedarikçi";
+    activeTab === FINANCE_MODULES.supplier ||
+    activeTab === FINANCE_MODULES.customer;
+  const expenseModule = activeTab === FINANCE_MODULES.expenses;
+  const companyLabel =
+    activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi";
   const transactionLabel =
-    activeTab === "customer" ? "Tahsilat" : "Ödeme";
+    activeTab === FINANCE_MODULES.customer ? "Tahsilat" : "Ödeme";
   const activeStats = expenseModule ? expenseStats : paymentStats;
 
   return (
@@ -444,7 +447,7 @@ function Finance() {
               setSelectedRowId={setSelectedRowId}
             />
           )}
-          {activeTab === "expenses" && (
+          {activeTab === FINANCE_MODULES.expenses && (
             <ExpenseInvoiceTable
               rows={filteredExpenseRows}
               expenseCompanies={expenseCompanies}
@@ -472,7 +475,7 @@ function Finance() {
               setSelectedRowId={setSelectedRowId}
             />
           )}
-          {activeTab === "analysis" && (
+          {activeTab === FINANCE_MODULES.analysis && (
             <FinancialAnalysis
               analysisReport={analysisReport}
               analysisWorkOrders={analysisWorkOrders}

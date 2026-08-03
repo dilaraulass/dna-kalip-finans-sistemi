@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using DnaKalip.Api.Domain;
 using DnaKalip.Api.Entities;
 
 namespace DnaKalip.Api.Services.Contracts;
@@ -109,7 +110,7 @@ public sealed class ContractMilestoneSyncService
         {
             var root = document.RootElement;
 
-            return contract.FinanceTab == "musteri"
+            return contract.FinanceTab == FinanceTabs.Customer
                 ? BuildCustomerMilestones(root, contract.TotalAmount)
                 : BuildSupplierMilestones(root, contract.TotalAmount, contract.MoldCount);
         }
@@ -226,14 +227,14 @@ public sealed class ContractMilestoneSyncService
         milestone.PaymentTracking ??= new PaymentTracking
         {
             ContractMilestone = milestone,
-            Status = "pending",
+            Status = PaymentStatuses.Pending,
         };
     }
 
     private static bool HasMeaningfulPaymentTracking(PaymentTracking? tracking)
     {
         return tracking is not null &&
-            (tracking.Status == "paid" ||
+            (tracking.Status == PaymentStatuses.Paid ||
             tracking.ApprovalDate.HasValue ||
             tracking.PaymentDate.HasValue ||
             tracking.DueDaysOverride.HasValue);
