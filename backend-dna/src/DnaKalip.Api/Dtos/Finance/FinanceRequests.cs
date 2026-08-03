@@ -5,3 +5,14 @@ public sealed record UpdatePaymentTrackingRequest(
     DateOnly? PaymentDate,
     string Status,
     int? DueDaysOverride);
+
+public sealed record UpdateExpenseInvoiceRequest(
+    string? WorkOrderNumber,
+    string? InvoiceType,
+    string Description,
+    decimal Amount,
+    string Currency,
+    DateOnly InvoiceDate,
+    int DueDays,
+    DateOnly? PaymentDate,
+    string Status);

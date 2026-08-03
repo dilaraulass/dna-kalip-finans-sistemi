@@ -62,13 +62,24 @@
 }
 
 .finance-detail-form-grid input,
-.finance-detail-form-grid select {
-  height: 38px;
+.finance-detail-form-grid select,
+.finance-detail-form-grid textarea {
   border: 1px solid #d1d5db;
   border-radius: 10px;
-  padding: 0 10px;
   color: #111827;
   font: inherit;
+}
+
+.finance-detail-form-grid input,
+.finance-detail-form-grid select {
+  height: 38px;
+  padding: 0 10px;
+}
+
+.finance-detail-form-grid textarea {
+  min-height: 86px;
+  padding: 10px;
+  resize: vertical;
 }
 
 .finance-detail-error {

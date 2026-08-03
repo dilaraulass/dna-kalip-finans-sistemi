@@ -229,6 +229,46 @@ public static class FinanceEndpoints
         .WithTags("Finance")
         .WithName("UpdatePaymentTracking");
 
+        app.MapPut("/api/expense-invoices/{id:guid}", async (
+            Guid id,
+            UpdateExpenseInvoiceRequest request,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var validationErrors = ValidateExpenseInvoiceRequest(request);
+
+            if (validationErrors.Count > 0)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            var invoice = await db.ExpenseInvoices
+                .FirstOrDefaultAsync(
+                    item => item.Id == id,
+                    cancellationToken);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            invoice.WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber);
+            invoice.InvoiceType = NormalizeOptional(request.InvoiceType);
+            invoice.Description = request.Description.Trim();
+            invoice.Amount = request.Amount;
+            invoice.Currency = NormalizeCurrency(request.Currency);
+            invoice.InvoiceDate = request.InvoiceDate;
+            invoice.DueDays = request.DueDays;
+            invoice.PaymentDate = request.PaymentDate;
+            invoice.Status = request.Status.Trim().ToLowerInvariant();
+
+            await db.SaveChangesAsync(cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithTags("Finance")
+        .WithName("UpdateExpenseInvoice");
+
         return app;
     }
 
@@ -246,6 +286,41 @@ public static class FinanceEndpoints
         if (request.DueDaysOverride is < 0)
         {
             errors["dueDaysOverride"] = ["Vade negatif olamaz."];
+        }
+
+        return errors;
+    }
+
+    private static Dictionary<string, string[]> ValidateExpenseInvoiceRequest(
+        UpdateExpenseInvoiceRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var currency = request.Currency?.Trim().ToUpperInvariant();
+        var status = request.Status?.Trim().ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            errors["description"] = ["Açıklama zorunludur."];
+        }
+
+        if (request.Amount < 0)
+        {
+            errors["amount"] = ["Tutar negatif olamaz."];
+        }
+
+        if (currency is not ("TRY" or "EUR" or "USD" or "TL"))
+        {
+            errors["currency"] = ["Para birimi TRY, EUR veya USD olmalıdır."];
+        }
+
+        if (request.DueDays < 0)
+        {
+            errors["dueDays"] = ["Vade negatif olamaz."];
+        }
+
+        if (status is not ("paid" or "pending"))
+        {
+            errors["status"] = ["Durum paid veya pending olmalıdır."];
         }
 
         return errors;
@@ -309,6 +384,11 @@ public static class FinanceEndpoints
         string fallback = "-")
     {
         return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private sealed record FinanceRowStatus(

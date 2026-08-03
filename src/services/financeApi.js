@@ -57,3 +57,14 @@ export function updatePaymentTracking(milestoneId, payload, { signal } = {}) {
     signal,
   });
 }
+
+export function updateExpenseInvoice(invoiceId, payload, { signal } = {}) {
+  return request(`/expense-invoices/${invoiceId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+}

@@ -5,6 +5,7 @@ import {
 } from "../services/financeService";
 import {
   getFinanceDashboard,
+  updateExpenseInvoice,
   updatePaymentTracking,
 } from "../services/financeApi";
 import "./Finance.css";
@@ -33,8 +34,8 @@ function Finance() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [paymentUpdateError, setPaymentUpdateError] = useState("");
-  const [paymentUpdateSubmitting, setPaymentUpdateSubmitting] = useState(false);
+  const [detailUpdateError, setDetailUpdateError] = useState("");
+  const [detailUpdateSubmitting, setDetailUpdateSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("supplier");
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -340,25 +341,44 @@ function Finance() {
     setSearchText("");
     setSelectedRow(null);
     setSelectedRowId(null);
-    setPaymentUpdateError("");
+    setDetailUpdateError("");
   };
 
   async function handlePaymentTrackingSave(payload) {
     if (!selectedRow) return;
 
     try {
-      setPaymentUpdateSubmitting(true);
-      setPaymentUpdateError("");
+      setDetailUpdateSubmitting(true);
+      setDetailUpdateError("");
       await updatePaymentTracking(selectedRow.id, payload);
       await loadFinanceDashboard();
       setSelectedRow(null);
       setSelectedRowId(null);
     } catch (requestError) {
-      setPaymentUpdateError(
+      setDetailUpdateError(
         requestError.message || "Ödeme takibi güncellenemedi.",
       );
     } finally {
-      setPaymentUpdateSubmitting(false);
+      setDetailUpdateSubmitting(false);
+    }
+  }
+
+  async function handleExpenseInvoiceSave(payload) {
+    if (!selectedRow) return;
+
+    try {
+      setDetailUpdateSubmitting(true);
+      setDetailUpdateError("");
+      await updateExpenseInvoice(selectedRow.id, payload);
+      await loadFinanceDashboard();
+      setSelectedRow(null);
+      setSelectedRowId(null);
+    } catch (requestError) {
+      setDetailUpdateError(
+        requestError.message || "Fatura bilgileri güncellenemedi.",
+      );
+    } finally {
+      setDetailUpdateSubmitting(false);
     }
   }
 
@@ -418,7 +438,7 @@ function Finance() {
               setSearchText={setSearchText}
               selectedRowId={selectedRowId}
               setSelectedRow={(row) => {
-                setPaymentUpdateError("");
+                setDetailUpdateError("");
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
@@ -445,7 +465,10 @@ function Finance() {
               expenseViewMode={expenseViewMode}
               setExpenseViewMode={setExpenseViewMode}
               selectedRowId={selectedRowId}
-              setSelectedRow={setSelectedRow}
+              setSelectedRow={(row) => {
+                setDetailUpdateError("");
+                setSelectedRow(row);
+              }}
               setSelectedRowId={setSelectedRowId}
             />
           )}
@@ -469,7 +492,7 @@ function Finance() {
         isOpen={!!selectedRow}
         onClose={() => {
           setSelectedRow(null);
-          setPaymentUpdateError("");
+          setDetailUpdateError("");
         }}
         title={expenseModule ? "Fatura Detayı" : `${transactionLabel} Detayı`}
         subtitle={
@@ -479,16 +502,20 @@ function Finance() {
       >
         {expenseModule ? (
           <ExpenseDetail
+            key={selectedRow?.id}
             selectedRow={selectedRow}
             displayCurrency={displayCurrency}
+            error={detailUpdateError}
+            saving={detailUpdateSubmitting}
+            onSave={handleExpenseInvoiceSave}
           />
         ) : (
           <FinanceDetail
             key={selectedRow?.id}
             selectedRow={selectedRow}
             displayCurrency={displayCurrency}
-            error={paymentUpdateError}
-            saving={paymentUpdateSubmitting}
+            error={detailUpdateError}
+            saving={detailUpdateSubmitting}
             onSave={handlePaymentTrackingSave}
           />
         )}
