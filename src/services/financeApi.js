@@ -1,12 +1,14 @@
 const API_BASE_URL = "/api";
 
 async function request(path, options = {}) {
+  const { headers, ...fetchOptions } = options;
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...fetchOptions,
     headers: {
       Accept: "application/json",
-      ...options.headers,
+      ...headers,
     },
-    ...options,
   });
 
   if (!response.ok) {
@@ -28,9 +30,30 @@ async function request(path, options = {}) {
     throw new Error(message);
   }
 
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!contentType.includes("application/json")) {
+    return null;
+  }
+
   return response.json();
 }
 
 export function getFinanceDashboard({ signal } = {}) {
   return request("/finance/dashboard", { signal });
+}
+
+export function updatePaymentTracking(milestoneId, payload, { signal } = {}) {
+  return request(`/contract-milestones/${milestoneId}/payment-tracking`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
 }

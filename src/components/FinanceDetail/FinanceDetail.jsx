@@ -1,8 +1,53 @@
+import { useState } from "react";
 import "./FinanceDetail.css";
 import { formatMoney } from "../../services/financeService";
 
-function FinanceDetail({ selectedRow, displayCurrency }) {
+function getInitialForm(selectedRow) {
+  return {
+    approvalDate: selectedRow?.approvalDate || "",
+    paymentDate: selectedRow?.paymentDate || "",
+    status: selectedRow?.paymentStatus || "pending",
+    dueDays: String(selectedRow?.activeDueDays ?? ""),
+  };
+}
+
+function FinanceDetail({
+  selectedRow,
+  displayCurrency,
+  error = "",
+  saving = false,
+  onSave,
+}) {
+  const [form, setForm] = useState(() => getInitialForm(selectedRow));
+
   if (!selectedRow) return null;
+
+  function handleChange(event) {
+    const { name, value } = event.target;
+
+    setForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+    }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    const parsedDueDays =
+      form.dueDays === "" ? null : Number.parseInt(form.dueDays, 10);
+    const dueDaysOverride =
+      parsedDueDays === null || parsedDueDays === selectedRow.defaultDueDays
+        ? null
+        : parsedDueDays;
+
+    onSave?.({
+      approvalDate: form.approvalDate || null,
+      paymentDate: form.paymentDate || null,
+      status: form.status,
+      dueDaysOverride,
+    });
+  }
 
   return (
     <div className="finance-detail">
@@ -75,7 +120,7 @@ function FinanceDetail({ selectedRow, displayCurrency }) {
           </div>
 
           <div>
-            <span>Ödeme Tarihi</span>
+            <span>Ödeme / Tahsilat Tarihi</span>
             <strong>{selectedRow.paymentDate || "-"}</strong>
           </div>
 
@@ -86,6 +131,63 @@ function FinanceDetail({ selectedRow, displayCurrency }) {
         </div>
       </div>
 
+      <form className="finance-detail-section" onSubmit={handleSubmit}>
+        <h3>Takip Bilgilerini Güncelle</h3>
+
+        {error && <div className="finance-detail-error">{error}</div>}
+
+        <div className="finance-detail-form-grid">
+          <label>
+            <span>Onay Tarihi</span>
+            <input
+              type="date"
+              name="approvalDate"
+              value={form.approvalDate}
+              onChange={handleChange}
+            />
+          </label>
+
+          <label>
+            <span>Ödeme / Tahsilat Tarihi</span>
+            <input
+              type="date"
+              name="paymentDate"
+              value={form.paymentDate}
+              onChange={handleChange}
+            />
+          </label>
+
+          <label>
+            <span>Durum</span>
+            <select name="status" value={form.status} onChange={handleChange}>
+              <option value="pending">Bekleyen</option>
+              <option value="paid">Ödenen</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Vade (Gün)</span>
+            <input
+              type="number"
+              name="dueDays"
+              min="0"
+              value={form.dueDays}
+              onChange={handleChange}
+            />
+          </label>
+        </div>
+
+        <div className="finance-detail-actions">
+          <button
+            type="submit"
+            className="detail-btn primary"
+            disabled={saving}
+          >
+            {saving ? "Kaydediliyor..." : "Kaydet"}
+          </button>
+        </div>
+      </form>
+
       <div className="finance-detail-section">
         <h3>Hakediş Şartı</h3>
 
@@ -94,23 +196,7 @@ function FinanceDetail({ selectedRow, displayCurrency }) {
           {selectedRow.subMilestone && ` — ${selectedRow.subMilestone}`}
         </p>
       </div>
-      <div className="finance-detail-actions">
-            
-      {/* <button className="detail-btn primary">
-        PDF Görüntüle
-      </button>
-
-      <button className="detail-btn secondary">
-        Ödeme Geçmişi
-      </button>
-
-      <button className="detail-btn secondary">
-        Düzenle
-      </button> */}
     </div>
-
-  </div>
-       
   );
 }
 

@@ -1,5 +1,6 @@
 using DnaKalip.Api.Data;
 using DnaKalip.Api.Dtos.Finance;
+using DnaKalip.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace DnaKalip.Api.Endpoints;
@@ -178,7 +179,76 @@ public static class FinanceEndpoints
         })
         .WithName("GetFinanceDashboard");
 
+        app.MapPut("/api/contract-milestones/{milestoneId:guid}/payment-tracking", async (
+            Guid milestoneId,
+            UpdatePaymentTrackingRequest request,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var validationErrors = ValidatePaymentTrackingRequest(request);
+
+            if (validationErrors.Count > 0)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            var milestoneExists = await db.ContractMilestones
+                .AnyAsync(
+                    item => item.Id == milestoneId,
+                    cancellationToken);
+
+            if (!milestoneExists)
+            {
+                return Results.NotFound();
+            }
+
+            var paymentTracking = await db.PaymentTrackings
+                .FirstOrDefaultAsync(
+                    item => item.ContractMilestoneId == milestoneId,
+                    cancellationToken);
+
+            if (paymentTracking is null)
+            {
+                paymentTracking = new PaymentTracking
+                {
+                    ContractMilestoneId = milestoneId,
+                };
+
+                db.PaymentTrackings.Add(paymentTracking);
+            }
+
+            paymentTracking.ApprovalDate = request.ApprovalDate;
+            paymentTracking.PaymentDate = request.PaymentDate;
+            paymentTracking.Status = request.Status.Trim().ToLowerInvariant();
+            paymentTracking.DueDaysOverride = request.DueDaysOverride;
+
+            await db.SaveChangesAsync(cancellationToken);
+
+            return Results.NoContent();
+        })
+        .WithTags("Finance")
+        .WithName("UpdatePaymentTracking");
+
         return app;
+    }
+
+    private static Dictionary<string, string[]> ValidatePaymentTrackingRequest(
+        UpdatePaymentTrackingRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var status = request.Status?.Trim().ToLowerInvariant();
+
+        if (status is not ("paid" or "pending"))
+        {
+            errors["status"] = ["Durum paid veya pending olmalıdır."];
+        }
+
+        if (request.DueDaysOverride is < 0)
+        {
+            errors["dueDaysOverride"] = ["Vade negatif olamaz."];
+        }
+
+        return errors;
     }
 
     private static FinanceRowStatus GetStatus(

@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildFinancialAnalysis,
   convertAmount,
 } from "../services/financeService";
-import { getFinanceDashboard } from "../services/financeApi";
+import {
+  getFinanceDashboard,
+  updatePaymentTracking,
+} from "../services/financeApi";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
 import ExpenseInvoiceTable from "../components/Finance/ExpenseInvoiceTable";
@@ -30,6 +33,8 @@ function Finance() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [paymentUpdateError, setPaymentUpdateError] = useState("");
+  const [paymentUpdateSubmitting, setPaymentUpdateSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("supplier");
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -45,34 +50,40 @@ function Finance() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const loadFinanceDashboard = useCallback(async ({ signal } = {}) => {
+    await Promise.resolve();
 
-    async function loadFinanceDashboard() {
-      try {
-        setLoading(true);
-        setError("");
-        const data = await getFinanceDashboard({ signal: controller.signal });
-        setFinanceData({
-          paymentMilestones: data.paymentMilestones || [],
-          expenseInvoices: data.expenseInvoices || [],
-          exchangeRates: data.exchangeRates || { EUR: 1, USD: 1, TRY: 1 },
-        });
-      } catch (requestError) {
-        if (requestError.name !== "AbortError") {
-          setError("Finans verileri yüklenirken bir hata oluştu.");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+    try {
+      setLoading(true);
+      setError("");
+      const data = await getFinanceDashboard({ signal });
+      setFinanceData({
+        paymentMilestones: data.paymentMilestones || [],
+        expenseInvoices: data.expenseInvoices || [],
+        exchangeRates: data.exchangeRates || { EUR: 1, USD: 1, TRY: 1 },
+      });
+    } catch (requestError) {
+      if (requestError.name !== "AbortError") {
+        setError("Finans verileri yüklenirken bir hata oluştu.");
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false);
       }
     }
-
-    loadFinanceDashboard();
-
-    return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      loadFinanceDashboard({ signal: controller.signal });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadFinanceDashboard]);
 
   const supplierRows = useMemo(
     () =>
@@ -329,7 +340,27 @@ function Finance() {
     setSearchText("");
     setSelectedRow(null);
     setSelectedRowId(null);
+    setPaymentUpdateError("");
   };
+
+  async function handlePaymentTrackingSave(payload) {
+    if (!selectedRow) return;
+
+    try {
+      setPaymentUpdateSubmitting(true);
+      setPaymentUpdateError("");
+      await updatePaymentTracking(selectedRow.id, payload);
+      await loadFinanceDashboard();
+      setSelectedRow(null);
+      setSelectedRowId(null);
+    } catch (requestError) {
+      setPaymentUpdateError(
+        requestError.message || "Ödeme takibi güncellenemedi.",
+      );
+    } finally {
+      setPaymentUpdateSubmitting(false);
+    }
+  }
 
   const paymentModule =
     activeTab === "supplier" || activeTab === "customer";
@@ -386,7 +417,10 @@ function Finance() {
               searchText={searchText}
               setSearchText={setSearchText}
               selectedRowId={selectedRowId}
-              setSelectedRow={setSelectedRow}
+              setSelectedRow={(row) => {
+                setPaymentUpdateError("");
+                setSelectedRow(row);
+              }}
               setSelectedRowId={setSelectedRowId}
             />
           )}
@@ -433,7 +467,10 @@ function Finance() {
       )}
       <Drawer
         isOpen={!!selectedRow}
-        onClose={() => setSelectedRow(null)}
+        onClose={() => {
+          setSelectedRow(null);
+          setPaymentUpdateError("");
+        }}
         title={expenseModule ? "Fatura Detayı" : `${transactionLabel} Detayı`}
         subtitle={
           expenseModule ? selectedRow?.company : selectedRow?.contractNumber
@@ -447,8 +484,12 @@ function Finance() {
           />
         ) : (
           <FinanceDetail
+            key={selectedRow?.id}
             selectedRow={selectedRow}
             displayCurrency={displayCurrency}
+            error={paymentUpdateError}
+            saving={paymentUpdateSubmitting}
+            onSave={handlePaymentTrackingSave}
           />
         )}
       </Drawer>
