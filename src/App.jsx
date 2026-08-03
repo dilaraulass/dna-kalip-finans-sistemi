@@ -5,7 +5,6 @@ import PaymentTracking from "./pages/PaymentTracking";
 import logo from "./assets/logo.png";
 import { FaFileContract } from "react-icons/fa";
 import { FaMoneyBillTrendUp } from "react-icons/fa6";
-import { MdPayments } from "react-icons/md";
 import { HiBars3 } from "react-icons/hi2";
 import { useState } from "react";
 import "./App.css";
@@ -43,10 +42,6 @@ function App() {
             {sidebarOpen && <span>Sözleşmeler</span>}
           </NavLink>
 
-          <NavLink to="/payments" className="menu-item">
-            <MdPayments size={22} />
-            {sidebarOpen && <span>Ödeme Takibi</span>}
-          </NavLink>
         </nav>
 
        
