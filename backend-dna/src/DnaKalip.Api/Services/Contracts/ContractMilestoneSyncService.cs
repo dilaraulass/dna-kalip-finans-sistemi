@@ -127,6 +127,12 @@ public sealed class ContractMilestoneSyncService
             var rate = GetDecimal(root, $"customerPaymentRate{index}") ?? 0;
             var condition = GetString(root, $"customerPaymentCondition{index}");
             var dueDays = GetInt(root, $"customerPaymentDueDays{index}") ?? 0;
+
+            if (rate <= 0 && string.IsNullOrWhiteSpace(condition) && dueDays <= 0)
+            {
+                continue;
+            }
+
             var amount = totalAmount > 0 ? totalAmount * rate / 100 : 0;
             var milestoneIndex = index - 1;
 

@@ -16,6 +16,21 @@ const FINANCE_TAB_LABELS = {
   tedarikci: "Tedarikçi",
 };
 
+const CONTRACT_TYPE_LABELS = {
+  OFT: "OFT-",
+  "OFT-REV": "OFT-REV-",
+  TSR: "TSR-",
+  TMP: "TMP-",
+  MP0: "MP0-",
+  FSN: "FSN-",
+  REV: "REV-",
+};
+
+const CONTRACT_TYPE_OPTIONS_BY_TAB = {
+  tedarikci: ["OFT", "TSR", "TMP", "MP0", "FSN", "REV"],
+  musteri: ["OFT", "OFT-REV", "MP0", "FSN", "REV"],
+};
+
 const currencyFormatter = new Intl.NumberFormat("tr-TR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -143,7 +158,7 @@ const CONTRACT_EDITOR_CONFIG = {
     dnaRole: "TEDARİKÇİ / SATICI",
     counterpartyRole: "MÜŞTERİ",
     subjectText:
-      "İşbu sözleşmenin konusu; müşteri tarafından teknik şartname, data ve resimleri sağlanan işin, DNA KALIP tarafından imal edilerek teslim edilmesini kapsar.",
+      "İşbu sözleşmenin konusu; MÜŞTERİ tarafından teknik şartname, data ve resimleri sağlanan aşağıda detayları belirtilen işin, DNA KALIP tarafından imal edilerek teslim edilmesini kapsar.",
     scopePlaceholder:
       "Müşteri tarafındaki sorumluluk alanını veya detayları yazın...",
   },
@@ -212,6 +227,130 @@ const ANNEX_ITEMS = [
   ["annexAdministrativeSpec", "İdari Şartname"],
 ];
 
+const SUPPLIER_RESPONSIBILITY_FIELDS = SUPPLIER_RESPONSIBILITIES.map(
+  ([name]) => name,
+);
+const DNA_SUPPORT_FIELDS = DNA_SUPPORT_ITEMS.map(([name]) => name);
+const DELIVERY_DOCUMENT_FIELDS = DELIVERY_DOCUMENTS.map(([name]) => name);
+const SUPPLIER_PAYMENT_OPTION_FIELDS = [
+  "supplierPaymentOption1",
+  "supplierPaymentOption2",
+  "supplierPaymentOption3",
+  "supplierPaymentOption4",
+  "supplierPaymentOption5",
+];
+const ANNEX_FIELDS = ANNEX_ITEMS.map(([name]) => name);
+
+const SUPPLIER_CONTRACT_TYPE_DEFAULTS = {
+  OFT: {
+    paymentOption: "supplierPaymentOption1",
+    responsibilities: SUPPLIER_RESPONSIBILITY_FIELDS,
+    dnaSupport: ["dnaOriginalModel", "dnaTechnicalDrawing", "dnaFixture"],
+    documents: DELIVERY_DOCUMENT_FIELDS,
+  },
+  "OFT-REV": {
+    paymentOption: "supplierPaymentOption1",
+    responsibilities: SUPPLIER_RESPONSIBILITY_FIELDS,
+    dnaSupport: ["dnaOriginalModel", "dnaTechnicalDrawing", "dnaFixture"],
+    documents: DELIVERY_DOCUMENT_FIELDS,
+  },
+  TSR: {
+    paymentOption: "supplierPaymentOption3",
+    responsibilities: ["respProcessDesign", "respMoldDesign"],
+    dnaSupport: ["dnaOriginalModel", "dnaTechnicalDrawing"],
+    documents: ["docMoldData", "docMaterialList"],
+  },
+  TMP: {
+    paymentOption: "supplierPaymentOption2",
+    responsibilities: [
+      "respMoldDesign",
+      "respMaterialSupply",
+      "respMachining",
+      "respHeatTreatment",
+      "respCoating",
+      "respAssembly",
+      "respShipment",
+      "respBuyoff",
+    ],
+    dnaSupport: [
+      "dnaOriginalModel",
+      "dnaTechnicalDrawing",
+      "dnaProcessDesign",
+    ],
+    documents: [
+      "docMoldData",
+      "docMaterialList",
+      "docMaterialCertificate",
+      "docHeatTreatmentReport",
+      "docMeasurementReport",
+    ],
+  },
+  MP0: {
+    paymentOption: "supplierPaymentOption4",
+    responsibilities: [
+      "respMachining",
+      "respAssembly",
+      "respShipment",
+      "respBuyoff",
+      "respPressTryout",
+    ],
+    dnaSupport: [
+      "dnaOriginalModel",
+      "dnaTechnicalDrawing",
+      "dnaProcessDesign",
+      "dnaMoldDesign",
+      "dnaRawMaterial",
+      "dnaStandardMaterial",
+    ],
+    documents: ["docMeasurementReport"],
+  },
+  FSN: {
+    paymentOption: "supplierPaymentOption5",
+    responsibilities: ["respMachining", "respShipment", "respBuyoff"],
+    dnaSupport: [
+      "dnaOriginalModel",
+      "dnaTechnicalDrawing",
+      "dnaProcessDesign",
+      "dnaMoldDesign",
+      "dnaRawMaterial",
+      "dnaStandardMaterial",
+    ],
+    documents: ["docCncData", "docOperationData"],
+  },
+  REV: {
+    paymentOption: "supplierPaymentOption5",
+    responsibilities: [
+      "respMachining",
+      "respAssembly",
+      "respShipment",
+      "respBuyoff",
+    ],
+    dnaSupport: ["dnaMoldDesign"],
+    documents: ["docMeasurementReport"],
+  },
+};
+
+const CUSTOMER_PAYMENT_FIELDS = [
+  ["customerPaymentRate1", "customerPaymentCondition1", "customerPaymentDueDays1"],
+  ["customerPaymentRate2", "customerPaymentCondition2", "customerPaymentDueDays2"],
+  ["customerPaymentRate3", "customerPaymentCondition3", "customerPaymentDueDays3"],
+  ["customerPaymentRate4", "customerPaymentCondition4", "customerPaymentDueDays4"],
+];
+
+const CUSTOMER_OFT_PAYMENT_DEFAULTS = [
+  ["30", "Kalıp Tasarım Onayı", "15"],
+  ["20", "Lazer Numune Teslimi", "30"],
+  ["30", "Min. %95 Uygun Off Tool Parça Teslimi", "60"],
+  ["20", "Parça, Kalıp Onayı ve PPAP Onayı", "60"],
+];
+
+const CUSTOMER_SINGLE_PAYMENT_DEFAULTS = [
+  ["100", "İş Tesliminde", "60"],
+  ["", "", ""],
+  ["", "", ""],
+  ["", "", ""],
+];
+
 function formatMoney(amount, currency) {
   return `${currencyFormatter.format(amount ?? 0)} ${currency || ""}`.trim();
 }
@@ -222,6 +361,116 @@ function formatFinanceTab(financeTab) {
 
 function formatValue(value) {
   return value || "-";
+}
+
+function getContractTypeOptions(financeTab) {
+  return (
+    CONTRACT_TYPE_OPTIONS_BY_TAB[financeTab] ||
+    CONTRACT_TYPE_OPTIONS_BY_TAB.musteri
+  );
+}
+
+function getValidContractType(financeTab, contractType) {
+  const options = getContractTypeOptions(financeTab);
+
+  return options.includes(contractType) ? contractType : options[0];
+}
+
+function applySupplierContractTypeDefaults(form, contractType) {
+  const defaults = SUPPLIER_CONTRACT_TYPE_DEFAULTS[contractType];
+
+  if (!defaults || form.financeTab !== "tedarikci") {
+    return form;
+  }
+
+  const nextForm = {
+    ...form,
+    contractType,
+  };
+
+  SUPPLIER_PAYMENT_OPTION_FIELDS.forEach((fieldName) => {
+    nextForm[fieldName] = fieldName === defaults.paymentOption;
+  });
+
+  SUPPLIER_RESPONSIBILITY_FIELDS.forEach((fieldName) => {
+    nextForm[fieldName] = defaults.responsibilities.includes(fieldName);
+  });
+
+  DNA_SUPPORT_FIELDS.forEach((fieldName) => {
+    nextForm[fieldName] = defaults.dnaSupport.includes(fieldName);
+  });
+
+  DELIVERY_DOCUMENT_FIELDS.forEach((fieldName) => {
+    nextForm[fieldName] = defaults.documents.includes(fieldName);
+  });
+
+  ANNEX_FIELDS.forEach((fieldName) => {
+    nextForm[fieldName] = true;
+  });
+
+  return nextForm;
+}
+
+function applyCustomerContractTypeDefaults(form, contractType) {
+  if (form.financeTab !== "musteri") {
+    return form;
+  }
+
+  const paymentDefaults =
+    contractType === "OFT"
+      ? CUSTOMER_OFT_PAYMENT_DEFAULTS
+      : CUSTOMER_SINGLE_PAYMENT_DEFAULTS;
+  const nextForm = {
+    ...form,
+    contractType,
+  };
+
+  CUSTOMER_PAYMENT_FIELDS.forEach(
+    ([rateField, conditionField, dueDaysField], index) => {
+      const [rate, condition, dueDays] = paymentDefaults[index];
+
+      nextForm[rateField] = rate;
+      nextForm[conditionField] = condition;
+      nextForm[dueDaysField] = dueDays;
+    },
+  );
+
+  return nextForm;
+}
+
+function applyContractTypeDefaults(form, contractType) {
+  if (form.financeTab === "tedarikci") {
+    return applySupplierContractTypeDefaults(form, contractType);
+  }
+
+  return applyCustomerContractTypeDefaults(form, contractType);
+}
+
+function buildNextContractForm(currentForm, event) {
+  const { checked, name, type, value } = event.target;
+  const nextValue = type === "checkbox" ? checked : value;
+  const nextForm = {
+    ...currentForm,
+    [name]: nextValue,
+  };
+
+  if (name === "contractType") {
+    return applyContractTypeDefaults(nextForm, value);
+  }
+
+  if (name === "financeTab") {
+    const validContractType = getValidContractType(value, nextForm.contractType);
+
+    return applyContractTypeDefaults(
+      {
+        ...nextForm,
+        contractType: validContractType,
+      },
+      validContractType,
+    );
+  }
+
+  return nextForm;
 }
 
 function parseContractFormData(formDataJson) {
@@ -608,19 +857,11 @@ function ContractsPage() {
   }
 
   function handleCreateFormChange(event) {
-    const { checked, name, type, value } = event.target;
-    setCreateForm((currentForm) => ({
-      ...currentForm,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setCreateForm((currentForm) => buildNextContractForm(currentForm, event));
   }
 
   function handleEditFormChange(event) {
-    const { checked, name, type, value } = event.target;
-    setEditForm((currentForm) => ({
-      ...currentForm,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setEditForm((currentForm) => buildNextContractForm(currentForm, event));
   }
 
   async function handleCreateSubmit(event) {
@@ -891,6 +1132,7 @@ function CreateContractForm({
   submitLabel = "Sözleşme Oluştur",
 }) {
   const activeTemplate = CONTRACT_EDITOR_CONFIG[form.financeTab];
+  const contractTypeOptions = getContractTypeOptions(form.financeTab);
   const totalPages = form.financeTab === "tedarikci" ? 4 : 2;
   const [partImageError, setPartImageError] = useState("");
 
@@ -991,13 +1233,11 @@ function CreateContractForm({
                   value={form.contractType}
                   onChange={onChange}
                 >
-                  <option value="OFT">OFT-</option>
-                  <option value="OFT-REV">OFT-REV-</option>
-                  <option value="TSR">TSR-</option>
-                  <option value="TMP">TMP-</option>
-                  <option value="MP0">MP0-</option>
-                  <option value="FSN">FSN-</option>
-                  <option value="REV">REV-</option>
+                  {contractTypeOptions.map((contractType) => (
+                    <option key={contractType} value={contractType}>
+                      {CONTRACT_TYPE_LABELS[contractType]}
+                    </option>
+                  ))}
                 </select>
                 <input
                   name="contractNumberSuffix"
@@ -1734,12 +1974,19 @@ function SupplierPaymentOption({
 }
 
 function CustomerPaymentTermsSection({ form, onChange }) {
-  const rows = [
-    ["customerPaymentRate1", "customerPaymentAmount1", "customerPaymentCondition1", "customerPaymentDueDays1"],
-    ["customerPaymentRate2", "customerPaymentAmount2", "customerPaymentCondition2", "customerPaymentDueDays2"],
-    ["customerPaymentRate3", "customerPaymentAmount3", "customerPaymentCondition3", "customerPaymentDueDays3"],
-    ["customerPaymentRate4", "customerPaymentAmount4", "customerPaymentCondition4", "customerPaymentDueDays4"],
-  ];
+  const rows = CUSTOMER_PAYMENT_FIELDS.map(
+    ([rateField, conditionField, dueDaysField], index) => [
+      rateField,
+      `customerPaymentAmount${index + 1}`,
+      conditionField,
+      dueDaysField,
+    ],
+  ).filter(([rateName, , conditionName, dueName], index) => {
+    if (form.contractType === "OFT") return true;
+    if (index === 0) return true;
+
+    return Boolean(form[rateName] || form[conditionName] || form[dueName]);
+  });
   const totalRate = rows.reduce(
     (sum, [rateName]) => sum + (Number(form[rateName]) || 0),
     0,
