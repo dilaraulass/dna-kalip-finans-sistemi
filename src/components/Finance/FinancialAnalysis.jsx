@@ -25,19 +25,49 @@ function groupDetailsByWorkOrder(details) {
   }, []);
 }
 
-function escapeCsvValue(value) {
+function escapeExcelValue(value) {
   const normalizedValue = value === null || value === undefined ? "" : value;
-  const stringValue = String(normalizedValue).replaceAll('"', '""');
 
-  return `"${stringValue}"`;
+  return String(normalizedValue)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
-function downloadCsv(filename, rows) {
-  const csvContent = rows
-    .map((row) => row.map(escapeCsvValue).join(";"))
-    .join("\r\n");
-  const blob = new Blob([`\uFEFF${csvContent}`], {
-    type: "text/csv;charset=utf-8;",
+function buildExcelTable({ columns, rows }) {
+  const colGroup = columns
+    .map((column) => `<col style="width:${column.width}px;" />`)
+    .join("");
+  const headerRow = columns
+    .map((column) => `<th>${escapeExcelValue(column.label)}</th>`)
+    .join("");
+  const bodyRows = rows
+    .map(
+      (row) =>
+        `<tr>${columns
+          .map(
+            (column) =>
+              `<td class="${column.className || ""}">${escapeExcelValue(
+                row[column.key],
+              )}</td>`,
+          )
+          .join("")}</tr>`,
+    )
+    .join("");
+
+  return `
+    <table>
+      <colgroup>${colGroup}</colgroup>
+      <thead><tr>${headerRow}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  `;
+}
+
+function downloadExcel(filename, html) {
+  const blob = new Blob([`\uFEFF${html}`], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -85,52 +115,122 @@ function FinancialAnalysis({
         ? `${reportMonth} dönemi analiz ediliyor.`
         : "Sistemdeki tüm kayıtlar kümülatif olarak analiz ediliyor.";
 
-  const handleExportCsv = () => {
-    const rows = [
-      ["Rapor", reportDescription],
-      ["Para Birimi", displayCurrency],
-      [],
-      ["Özet", "Tutar"],
-      ["Tahsil Edilen", formatMoney(analysisTotals.paidIncome, displayCurrency)],
-      [
-        "Bekleyen Alacak",
-        formatMoney(analysisTotals.pendingIncome, displayCurrency),
-      ],
-      ["Toplam Gelir", formatMoney(analysisTotals.totalIncome, displayCurrency)],
-      ["Ödenen", formatMoney(analysisTotals.paidExpense, displayCurrency)],
-      [
-        "Bekleyen Borç",
-        formatMoney(analysisTotals.pendingExpense, displayCurrency),
-      ],
-      ["Toplam Gider", formatMoney(analysisTotals.totalExpense, displayCurrency)],
-      ["Net Kasa", formatMoney(analysisTotals.realProfit, displayCurrency)],
-      [
-        "Bekleyen Net",
-        formatMoney(analysisTotals.pendingProfit, displayCurrency),
-      ],
-      ["Genel Net", formatMoney(analysisTotals.totalProfit, displayCurrency)],
-      ["Kâr Marjı", `%${analysisTotals.margin}`],
-      [],
-      ["Tür", "İş Emri", "Tarih", "Açıklama", "Durum", "Tutar"],
-      ...analysisReport.incomeDetails.map((detail) => [
-        "Gelir",
-        detail.workOrder,
-        detail.date,
-        detail.description,
-        detail.status,
-        formatMoney(detail.income, displayCurrency),
-      ]),
-      ...analysisReport.expenseDetails.map((detail) => [
-        "Gider",
-        detail.workOrder,
-        detail.date,
-        detail.description,
-        detail.status,
-        formatMoney(detail.expense, displayCurrency),
-      ]),
+  const handleExportExcel = () => {
+    const summaryRows = [
+      {
+        label: "Tahsil Edilen",
+        amount: formatMoney(analysisTotals.paidIncome, displayCurrency),
+      },
+      {
+        label: "Bekleyen Alacak",
+        amount: formatMoney(analysisTotals.pendingIncome, displayCurrency),
+      },
+      {
+        label: "Toplam Gelir",
+        amount: formatMoney(analysisTotals.totalIncome, displayCurrency),
+      },
+      {
+        label: "Ödenen",
+        amount: formatMoney(analysisTotals.paidExpense, displayCurrency),
+      },
+      {
+        label: "Bekleyen Borç",
+        amount: formatMoney(analysisTotals.pendingExpense, displayCurrency),
+      },
+      {
+        label: "Toplam Gider",
+        amount: formatMoney(analysisTotals.totalExpense, displayCurrency),
+      },
+      {
+        label: "Net Kasa",
+        amount: formatMoney(analysisTotals.realProfit, displayCurrency),
+      },
+      {
+        label: "Bekleyen Net",
+        amount: formatMoney(analysisTotals.pendingProfit, displayCurrency),
+      },
+      {
+        label: "Genel Net",
+        amount: formatMoney(analysisTotals.totalProfit, displayCurrency),
+      },
+      { label: "Kâr Marjı", amount: `%${analysisTotals.margin}` },
     ];
+    const detailRows = [
+      ...analysisReport.incomeDetails.map((detail) => ({
+        type: "Gelir",
+        workOrder: detail.workOrder,
+        date: detail.date,
+        description: detail.description,
+        status: detail.status,
+        amount: formatMoney(detail.income, displayCurrency),
+      })),
+      ...analysisReport.expenseDetails.map((detail) => ({
+        type: "Gider",
+        workOrder: detail.workOrder,
+        date: detail.date,
+        description: detail.description,
+        status: detail.status,
+        amount: formatMoney(detail.expense, displayCurrency),
+      })),
+    ];
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; }
+            h1 { font-size: 20px; margin: 0 0 8px; }
+            h2 { font-size: 16px; margin: 24px 0 8px; color: #0f766e; }
+            p { margin: 4px 0; }
+            table { border-collapse: collapse; margin-top: 8px; }
+            th {
+              background: #e2e8f0;
+              border: 1px solid #94a3b8;
+              font-weight: 700;
+              padding: 8px;
+              text-align: left;
+            }
+            td {
+              border: 1px solid #cbd5e1;
+              padding: 8px;
+              vertical-align: top;
+            }
+            .text { mso-number-format:"\\@"; }
+            .amount { font-weight: 700; text-align: right; white-space: nowrap; }
+          </style>
+        </head>
+        <body>
+          <h1>Finansal Analiz Raporu</h1>
+          <p><strong>Rapor:</strong> ${escapeExcelValue(reportDescription)}</p>
+          <p><strong>Para Birimi:</strong> ${escapeExcelValue(displayCurrency)}</p>
 
-    downloadCsv(`finansal-analiz-${getExportDateStamp()}.csv`, rows);
+          <h2>Özet</h2>
+          ${buildExcelTable({
+            columns: [
+              { key: "label", label: "Özet", width: 220 },
+              { key: "amount", label: "Tutar", width: 160, className: "amount" },
+            ],
+            rows: summaryRows,
+          })}
+
+          <h2>Detaylar</h2>
+          ${buildExcelTable({
+            columns: [
+              { key: "type", label: "Tür", width: 90 },
+              { key: "workOrder", label: "İş Emri", width: 100, className: "text" },
+              { key: "date", label: "Tarih", width: 120, className: "text" },
+              { key: "description", label: "Açıklama", width: 520 },
+              { key: "status", label: "Durum", width: 110 },
+              { key: "amount", label: "Tutar", width: 150, className: "amount" },
+            ],
+            rows: detailRows,
+          })}
+        </body>
+      </html>
+    `;
+
+    downloadExcel(`finansal-analiz-${getExportDateStamp()}.xls`, html);
   };
 
   const renderDetailRows = (groups, amountKey, emptyText) => {
@@ -314,7 +414,7 @@ function FinancialAnalysis({
           <button
             type="button"
             className="analysis-export-btn"
-            onClick={handleExportCsv}
+            onClick={handleExportExcel}
             disabled={!hasAnalysisDetails}
           >
             Excel'e Aktar
