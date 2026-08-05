@@ -436,8 +436,36 @@
   border-top: 1px solid #e5e7eb;
 }
 
-.analysis-detail-area > h3 {
-  margin: 0 0 16px;
+.analysis-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.analysis-detail-header h3 {
+  margin: 0;
+}
+
+.analysis-export-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #2563eb;
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.analysis-export-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.analysis-export-btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
 }
 
 .analysis-detail-grid {
@@ -530,6 +558,17 @@
   color: #0f172a;
 }
 
+.analysis-table .analysis-work-order-cell {
+  background: #f8fafc;
+  border-right: 1px solid #e5e7eb;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.analysis-amount {
+  display: block;
+}
+
 .analysis-table td span,
 .analysis-table td small {
   display: block;
@@ -539,6 +578,23 @@
 
 .analysis-table td small {
   font-size: 11px;
+}
+
+.analysis-status {
+  font-weight: 800;
+}
+
+.analysis-status.paid {
+  color: #059669 !important;
+}
+
+.analysis-status.pending,
+.analysis-status.approaching {
+  color: #d97706 !important;
+}
+
+.analysis-status.overdue {
+  color: #e11d48 !important;
 }
 
 .empty-analysis-row {
