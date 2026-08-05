@@ -23,6 +23,7 @@ public static class FinanceEndpoints
 
             var paymentMilestones = await db.ContractMilestones
                 .AsNoTracking()
+                .Where(milestone => !milestone.Contract.IsArchived)
                 .OrderBy(milestone => milestone.Contract.ContractDate)
                 .ThenBy(milestone => milestone.Contract.ContractNumber)
                 .ThenBy(milestone => milestone.SortOrder)

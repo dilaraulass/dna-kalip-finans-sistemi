@@ -21,6 +21,8 @@ public class Contract
     public string? ExchangeRateType { get; set; }
     public decimal? FixedExchangeRate { get; set; }
     public string? FormDataJson { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTimeOffset? ArchivedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Company? Company { get; set; }

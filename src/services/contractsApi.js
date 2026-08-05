@@ -1,12 +1,13 @@
 const API_BASE_URL = "/api";
 
 async function request(path, options = {}) {
+  const { headers, ...fetchOptions } = options;
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...fetchOptions,
     headers: {
       Accept: "application/json",
-      ...options.headers,
+      ...headers,
     },
-    ...options,
   });
 
   if (!response.ok) {
@@ -26,6 +27,10 @@ async function request(path, options = {}) {
     }
 
     throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return null;
   }
 
   return response.json();
@@ -57,6 +62,13 @@ export function updateContract(id, payload, { signal } = {}) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+export function archiveContract(id, { signal } = {}) {
+  return request(`/contracts/${id}/archive`, {
+    method: "PATCH",
     signal,
   });
 }

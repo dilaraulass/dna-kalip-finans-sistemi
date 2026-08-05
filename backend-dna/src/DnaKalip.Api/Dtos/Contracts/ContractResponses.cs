@@ -15,6 +15,8 @@ public sealed record ContractListItemResponse(
     int MoldCount,
     decimal TotalAmount,
     string Currency,
+    bool IsArchived,
+    DateTimeOffset? ArchivedAt,
     int MilestoneCount,
     int PaidMilestoneCount);
 
@@ -38,6 +40,8 @@ public sealed record ContractDetailResponse(
     string? ExchangeRateType,
     decimal? FixedExchangeRate,
     string? FormDataJson,
+    bool IsArchived,
+    DateTimeOffset? ArchivedAt,
     IReadOnlyCollection<ContractMilestoneResponse> Milestones);
 
 public sealed record CompanySummaryResponse(

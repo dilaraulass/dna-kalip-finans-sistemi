@@ -167,6 +167,30 @@ button.contracts-summary-card:hover {
   border-color: #94a3b8;
 }
 
+.contracts-danger-btn {
+  height: 38px;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #fff1f2;
+  color: #be123c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.contracts-danger-btn:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
+}
+
+.contracts-danger-btn:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .contracts-status {
   padding: 32px;
   border: 1px dashed #cbd5e1;

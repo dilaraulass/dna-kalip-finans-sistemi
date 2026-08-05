@@ -3,6 +3,7 @@ import { trTR } from "@mui/x-data-grid/locales";
 import { useEffect, useMemo, useState } from "react";
 import Drawer from "../components/Drawer/Drawer";
 import {
+  archiveContract,
   createContract,
   getContractById,
   getContracts,
@@ -669,6 +670,8 @@ function ContractsPage() {
   const [editForm, setEditForm] = useState(INITIAL_CONTRACT_FORM);
   const [editError, setEditError] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
+  const [archiveSubmitting, setArchiveSubmitting] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -817,6 +820,7 @@ function ContractsPage() {
     setPreviewDrawerOpen(false);
     setEditDrawerOpen(false);
     setEditError("");
+    setArchiveError("");
   }
 
   function openCreateDrawer() {
@@ -935,6 +939,31 @@ function ContractsPage() {
       setEditError(requestError.message || "Sözleşme güncellenemedi.");
     } finally {
       setEditSubmitting(false);
+    }
+  }
+
+  async function handleArchiveContract() {
+    if (!selectedContract || archiveSubmitting) return;
+
+    const confirmed = window.confirm(
+      `${selectedContract.contractNumber} numaralı sözleşme arşivlenecek. Arşivlenen sözleşme ana listede ve finans ekranında görünmez. Devam edilsin mi?`,
+    );
+
+    if (!confirmed) return;
+
+    setArchiveSubmitting(true);
+    setArchiveError("");
+
+    try {
+      await archiveContract(selectedContract.id);
+      const refreshedContracts = await getContracts();
+
+      setContracts(refreshedContracts);
+      closeDrawer();
+    } catch (requestError) {
+      setArchiveError(requestError.message || "Sözleşme arşivlenemedi.");
+    } finally {
+      setArchiveSubmitting(false);
     }
   }
 
@@ -1061,11 +1090,17 @@ function ContractsPage() {
           <div className="contracts-status error">{detailError}</div>
         )}
 
+        {!detailLoading && archiveError && (
+          <div className="contracts-status error">{archiveError}</div>
+        )}
+
         {!detailLoading && selectedContract && (
           <ContractDetail
             contract={selectedContract}
             onPreview={openPreviewDrawer}
             onEdit={openEditDrawer}
+            onArchive={handleArchiveContract}
+            archiveSubmitting={archiveSubmitting}
           />
         )}
       </Drawer>
@@ -2303,10 +2338,24 @@ function EditableField({
   );
 }
 
-function ContractDetail({ contract, onPreview, onEdit }) {
+function ContractDetail({
+  contract,
+  onPreview,
+  onEdit,
+  onArchive,
+  archiveSubmitting,
+}) {
   return (
     <div className="contract-detail">
       <div className="contract-detail-actions">
+        <button
+          type="button"
+          className="contracts-danger-btn"
+          onClick={onArchive}
+          disabled={archiveSubmitting}
+        >
+          {archiveSubmitting ? "Arşivleniyor..." : "Arşivle"}
+        </button>
         <button type="button" className="contracts-secondary-btn" onClick={onEdit}>
           Düzenle
         </button>

@@ -20,6 +20,7 @@ public static class ContractsEndpoints
         {
             var contracts = await db.Contracts
                 .AsNoTracking()
+                .Where(contract => !contract.IsArchived)
                 .OrderByDescending(contract => contract.ContractDate)
                 .ThenBy(contract => contract.ContractNumber)
                 .Select(contract => new ContractListItemResponse(
@@ -37,6 +38,8 @@ public static class ContractsEndpoints
                     contract.MoldCount,
                     contract.TotalAmount,
                     contract.Currency,
+                    contract.IsArchived,
+                    contract.ArchivedAt,
                     contract.Milestones.Count,
                     contract.Milestones.Count(milestone =>
                         milestone.PaymentTracking != null &&
@@ -281,6 +284,33 @@ public static class ContractsEndpoints
         })
         .WithName("UpdateContract");
 
+        group.MapPatch("/{id:guid}/archive", async (
+            Guid id,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var contract = await db.Contracts
+                .FirstOrDefaultAsync(
+                    item => item.Id == id,
+                    cancellationToken);
+
+            if (contract is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!contract.IsArchived)
+            {
+                contract.IsArchived = true;
+                contract.ArchivedAt = DateTimeOffset.UtcNow;
+
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("ArchiveContract");
+
         return app;
     }
 
@@ -320,6 +350,8 @@ public static class ContractsEndpoints
                 contract.ExchangeRateType,
                 contract.FixedExchangeRate,
                 contract.FormDataJson,
+                contract.IsArchived,
+                contract.ArchivedAt,
                 contract.Milestones
                     .OrderBy(milestone => milestone.SortOrder)
                     .Select(milestone => new ContractMilestoneResponse(
