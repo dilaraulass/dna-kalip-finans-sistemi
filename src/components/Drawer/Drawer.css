@@ -71,10 +71,17 @@
 }
 
 .drawer-floating-close {
+  flex: 0 0 auto;
+}
+
+.drawer-floating-actions {
   position: sticky;
   top: 16px;
-  float: right;
   z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
   margin: 16px 16px 0 0;
 }
 

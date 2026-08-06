@@ -1,6 +1,7 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { useEffect, useMemo, useState } from "react";
+import { FiPrinter } from "react-icons/fi";
 import Drawer from "../components/Drawer/Drawer";
 import {
   archiveContract,
@@ -1192,6 +1193,19 @@ function ContractsPage() {
         onClose={closePreviewDrawer}
         width={980}
         hideHeader
+        actions={
+          selectedContract && (
+            <button
+              type="button"
+              className="contract-preview-print-btn"
+              onClick={() => window.print()}
+              aria-label="Sözleşme çıktısı al veya PDF olarak kaydet"
+              title="Çıktı al / PDF olarak kaydet"
+            >
+              <FiPrinter aria-hidden="true" />
+            </button>
+          )
+        }
       >
         {selectedContract && (
           <ContractPreview
@@ -1616,7 +1630,7 @@ function ContractPreview({ contract, onCancel }) {
   }
 
   return (
-    <div>
+    <div className="contract-preview">
       {!contract.formDataJson && (
         <div className="contracts-status warning">
           Bu kayıt eski formatta oluşturulmuş. Şablon, ana sözleşme
@@ -1624,15 +1638,17 @@ function ContractPreview({ contract, onCancel }) {
         </div>
       )}
 
-      <CreateContractForm
-        form={previewForm}
-        error=""
-        submitting={false}
-        onChange={ignorePreviewChange}
-        onSubmit={handlePreviewSubmit}
-        onCancel={onCancel}
-        readOnly
-      />
+      <div className="contract-print-area">
+        <CreateContractForm
+          form={previewForm}
+          error=""
+          submitting={false}
+          onChange={ignorePreviewChange}
+          onSubmit={handlePreviewSubmit}
+          onCancel={onCancel}
+          readOnly
+        />
+      </div>
     </div>
   );
 }

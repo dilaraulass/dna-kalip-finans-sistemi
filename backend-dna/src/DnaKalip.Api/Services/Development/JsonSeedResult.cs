@@ -4,6 +4,7 @@ public sealed record JsonSeedResult(
     int CompaniesCreated,
     int ContractsCreated,
     int ContractsSkipped,
+    int ContractFormDataBackfilled,
     int MilestonesCreated,
     int PaymentTrackingsCreated,
     int ExpenseInvoicesCreated,

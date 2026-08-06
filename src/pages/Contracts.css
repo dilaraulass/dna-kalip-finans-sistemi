@@ -288,6 +288,41 @@ button.contracts-summary-card:hover {
   display: none;
 }
 
+.contract-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.contract-preview-print-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.contract-preview-print-btn:hover {
+  background: #1d4ed8;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.26);
+  transform: translateY(-1px);
+}
+
+.contract-preview-print-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
 .contract-document-stack {
   display: flex;
   flex-direction: column;
@@ -1289,5 +1324,82 @@ button.contracts-summary-card:hover {
 
   .contract-form-actions button {
     width: 100%;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .contract-print-area,
+  .contract-print-area * {
+    visibility: visible !important;
+  }
+
+  .contract-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    background: white;
+  }
+
+  .contract-editor-tabs,
+  .contract-form-actions,
+  .contracts-status.warning {
+    display: none !important;
+  }
+
+  .contract-form,
+  .contract-document-stack {
+    display: block;
+    gap: 0;
+  }
+
+  .contract-document-editor {
+    width: 210mm;
+    max-width: none;
+    min-height: 297mm;
+    margin: 0;
+    padding: 18mm 16mm 20mm;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .contract-document-editor:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .contract-document-page-content {
+    min-height: calc(297mm - 38mm);
+  }
+
+  .contract-document-header input,
+  .contract-document-number input,
+  .contract-document-number select,
+  .contract-document-section p input,
+  .contract-document-info-grid input,
+  .contract-document-amount-grid input,
+  .contract-document-amount-grid select,
+  .contract-document-toolbar input,
+  .contract-document-textarea textarea,
+  .contract-final-signatures input {
+    background: transparent !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

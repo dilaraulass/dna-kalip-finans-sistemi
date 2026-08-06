@@ -26,9 +26,10 @@ public sealed class JsonSeedService(
 
         var companies = await dbContext.Companies
             .ToDictionaryAsync(company => company.Name, StringComparer.OrdinalIgnoreCase, cancellationToken);
-        var existingContractNumbers = await dbContext.Contracts
-            .Select(contract => contract.ContractNumber)
-            .ToHashSetAsync(StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var existingContractsByNumber = await dbContext.Contracts
+            .ToDictionaryAsync(contract => contract.ContractNumber, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var existingContractNumbers = existingContractsByNumber.Keys
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var existingInvoiceKeys = await dbContext.ExpenseInvoices
             .Select(invoice => new
             {
@@ -73,7 +74,7 @@ public sealed class JsonSeedService(
                 continue;
             }
 
-            SeedContract(item, companies, existingContractNumbers, counters);
+            SeedContract(item, companies, existingContractsByNumber, existingContractNumbers, counters);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -82,6 +83,7 @@ public sealed class JsonSeedService(
             counters.CompaniesCreated,
             counters.ContractsCreated,
             counters.ContractsSkipped,
+            counters.ContractFormDataBackfilled,
             counters.MilestonesCreated,
             counters.PaymentTrackingsCreated,
             counters.ExpenseInvoicesCreated,
@@ -115,6 +117,7 @@ public sealed class JsonSeedService(
     private void SeedContract(
         JsonElement item,
         Dictionary<string, Company> companies,
+        Dictionary<string, Contract> existingContractsByNumber,
         HashSet<string> existingContractNumbers,
         SeedCounters counters)
     {
@@ -127,6 +130,21 @@ public sealed class JsonSeedService(
 
         if (string.IsNullOrWhiteSpace(contractNumber))
         {
+            counters.ContractsSkipped++;
+            return;
+        }
+
+        var legacyFormDataJson = BuildLegacyContractFormDataJson(item, finance, formData);
+
+        if (existingContractsByNumber.TryGetValue(contractNumber, out var existingContract))
+        {
+            if (!string.IsNullOrWhiteSpace(legacyFormDataJson) &&
+                string.IsNullOrWhiteSpace(existingContract.FormDataJson))
+            {
+                existingContract.FormDataJson = legacyFormDataJson;
+                counters.ContractFormDataBackfilled++;
+            }
+
             counters.ContractsSkipped++;
             return;
         }
@@ -178,12 +196,144 @@ public sealed class JsonSeedService(
             Currency = currency,
             ExchangeRateType = GetString(finance, "kurTipi"),
             FixedExchangeRate = GetDecimal(finance, "sabitKurDegeri"),
+            FormDataJson = legacyFormDataJson,
         };
 
         SeedMilestones(contract, finance, formData, trackingData, totalAmount, financeTab, moldCount, counters);
 
         dbContext.Contracts.Add(contract);
+        existingContractsByNumber[contractNumber] = contract;
         counters.ContractsCreated++;
+    }
+
+    private static string? BuildLegacyContractFormDataJson(
+        JsonElement item,
+        JsonElement finance,
+        JsonElement formData)
+    {
+        if (formData.ValueKind != JsonValueKind.Object && finance.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var financeTab = GetString(finance, "sekme") ?? "tedarikci";
+        var form = new Dictionary<string, object?>
+        {
+            ["contractNumber"] = GetString(finance, "tamSozlesmeNo") ?? GetString(item, "id") ?? string.Empty,
+            ["contractType"] = GetString(formData, "sozlesmeTuru") ?? GetString(finance, "sozlesmeTuru") ?? string.Empty,
+            ["contractNumberSuffix"] = GetString(formData, "sozlesmeNoSuffix") ?? GetString(finance, "sozlesmeNoSuffix") ?? string.Empty,
+            ["documentNumber"] = GetString(formData, "dokumanNo") ?? "DK F 024",
+            ["revisionDate"] = NormalizeDateInput(GetString(formData, "degTarihi")),
+            ["publishDate"] = NormalizeDateInput(GetString(formData, "yayinTarihi")) ?? "2026-04-07",
+            ["financeTab"] = financeTab,
+            ["companyName"] = GetString(finance, "tedarikci")
+                ?? GetString(formData, "tedarikci")
+                ?? GetString(formData, "musteriFirma")
+                ?? GetString(item, "tedarikci")
+                ?? string.Empty,
+            ["contractDate"] = NormalizeDateInput(GetString(formData, "tarih") ?? GetString(finance, "sozlesmeTarihi")),
+            ["projectNumber"] = GetString(formData, "projeNo") ?? GetString(finance, "projeNo") ?? string.Empty,
+            ["customerProject"] = GetString(formData, "isTanimiAciklama")
+                ?? GetString(formData, "musteriProjesi")
+                ?? GetString(finance, "musteriProjesi")
+                ?? string.Empty,
+            ["workOrderNumber"] = GetString(formData, "dnaIsEmriNo") ?? GetString(finance, "dnaIsEmriNo") ?? string.Empty,
+            ["referenceNumber"] = GetString(formData, "referansNo") ?? GetString(finance, "referansNo") ?? string.Empty,
+            ["partName"] = GetString(formData, "parcaAdi") ?? GetString(finance, "parcaAdi") ?? string.Empty,
+            ["moldCount"] = GetString(formData, "kalipAdeti") ?? GetString(finance, "kalipAdeti") ?? "1",
+            ["partImage"] = GetString(formData, "parcaGorseli") ?? string.Empty,
+            ["moldDesignDates"] = GetStringDictionary(formData, "kalipTarihleri"),
+            ["moldAmounts"] = GetStringDictionary(formData, "kalipTutarlari"),
+            ["totalAmount"] = GetString(formData, "toplamTutar")
+                ?? GetString(finance, "toplamTutarStr")
+                ?? GetString(finance, "toplamTutarNum")
+                ?? string.Empty,
+            ["currency"] = NormalizeCurrency(GetString(formData, "paraBirimi") ?? GetString(finance, "paraBirimi") ?? "EUR"),
+            ["exchangeRateType"] = GetString(formData, "kurTipi") ?? GetString(finance, "kurTipi") ?? string.Empty,
+            ["fixedExchangeRate"] = GetString(formData, "sabitKurDegeri") ?? GetString(finance, "sabitKurDegeri") ?? string.Empty,
+            ["workMold"] = GetBool(formData, "cb_kalip"),
+            ["workWeldingFixture"] = GetBool(formData, "cb_kaynak"),
+            ["workControlFixture"] = GetBool(formData, "cb_kontrol"),
+            ["respProcessDesign"] = GetBool(formData, "sorum_proses"),
+            ["respMoldDesign"] = GetBool(formData, "sorum_kalip"),
+            ["respMaterialSupply"] = GetBool(formData, "sorum_malzeme"),
+            ["respMachining"] = GetBool(formData, "sorum_isleme"),
+            ["respHeatTreatment"] = GetBool(formData, "sorum_isilIslem"),
+            ["respCoating"] = GetBool(formData, "sorum_kaplama"),
+            ["respAssembly"] = GetBool(formData, "sorum_montaj"),
+            ["respPressTryout"] = GetBool(formData, "sorum_pres"),
+            ["respLaserTryout"] = GetBool(formData, "sorum_lazer"),
+            ["respOffToolTryout"] = GetBool(formData, "sorum_offTool"),
+            ["respMeasurement"] = GetBool(formData, "sorum_olcum"),
+            ["respShipment"] = GetBool(formData, "sorum_sevk"),
+            ["respBuyoff"] = GetBool(formData, "sorum_buyoff"),
+            ["dnaOriginalModel"] = GetBool(formData, "dna_orjinalModel"),
+            ["dnaTechnicalDrawing"] = GetBool(formData, "dna_teknikResim"),
+            ["dnaProcessDesign"] = GetBool(formData, "dna_prosesTasarimi"),
+            ["dnaMoldDesign"] = GetBool(formData, "dna_kalipTasarimi"),
+            ["dnaRawMaterial"] = GetBool(formData, "dna_hammadde"),
+            ["dnaStandardMaterial"] = GetBool(formData, "dna_standartMalzeme"),
+            ["dnaFixture"] = GetBool(formData, "dna_fikstur"),
+            ["docDetailDrawing"] = GetBool(formData, "doc_resim"),
+            ["docModelData"] = GetBool(formData, "doc_model"),
+            ["docMoldData"] = GetBool(formData, "doc_kalipData"),
+            ["docMaterialList"] = GetBool(formData, "doc_malzemeListesi"),
+            ["docMeasurementReport"] = GetBool(formData, "doc_olcumRapor"),
+            ["docCapabilityReport"] = GetBool(formData, "doc_yeterlilik"),
+            ["docCoatingCertificate"] = GetBool(formData, "doc_kaplamaTest"),
+            ["docMaterialCertificate"] = GetBool(formData, "doc_malzemeSert"),
+            ["docCncData"] = GetBool(formData, "doc_cnc"),
+            ["docOperationData"] = GetBool(formData, "doc_operasyon"),
+            ["docHeatTreatmentReport"] = GetBool(formData, "doc_isilIslem"),
+            ["designDeliveryDate"] = NormalizeDateInput(GetString(formData, "tasarimTarihi")),
+            ["laserDeliveryDate"] = NormalizeDateInput(GetString(formData, "lazerTarihi")),
+            ["subcontractDeliveryDate"] = NormalizeDateInput(GetString(formData, "fasonTarihi")),
+            ["map0DeliveryDate"] = NormalizeDateInput(GetString(formData, "map0Tarihi")),
+            ["offToolDeliveryDate"] = NormalizeDateInput(GetString(formData, "offToolTarihi")),
+            ["sampleApprovalDate"] = NormalizeDateInput(GetString(formData, "numuneTarihi")),
+            ["supplierPaymentOption1"] = GetBool(formData, "odeme_opt1_secili"),
+            ["supplierPaymentOption2"] = GetBool(formData, "odeme_opt2_secili"),
+            ["supplierPaymentOption3"] = GetBool(formData, "odeme_opt3_secili"),
+            ["supplierPaymentOption4"] = GetBool(formData, "odeme_opt4_secili"),
+            ["supplierPaymentOption5"] = GetBool(formData, "odeme_opt5_secili"),
+            ["supplierOpt1Amount40"] = GetString(formData, "opt1_40") ?? string.Empty,
+            ["supplierOpt1Amount20a"] = GetString(formData, "opt1_20a") ?? string.Empty,
+            ["supplierOpt1Amount20b"] = GetString(formData, "opt1_20b") ?? string.Empty,
+            ["supplierOpt1Amount20c"] = GetString(formData, "opt1_20c") ?? string.Empty,
+            ["supplierOpt2Amount60"] = GetString(formData, "opt2_60") ?? string.Empty,
+            ["supplierOpt2Amount40"] = GetString(formData, "opt2_40") ?? string.Empty,
+            ["supplierOpt3Amount100"] = GetString(formData, "opt3_100") ?? string.Empty,
+            ["supplierOpt4Amount100"] = GetString(formData, "opt4_100") ?? string.Empty,
+            ["supplierOpt5Amount100"] = GetString(formData, "opt5_100") ?? string.Empty,
+            ["annexTechnicalSpec"] = GetBool(formData, "ek_teknik"),
+            ["annexSpecialRequests"] = GetBool(formData, "ek_ozel"),
+            ["annexCustomerSpec"] = GetBool(formData, "ek_musteri"),
+            ["annexAdministrativeSpec"] = GetBool(formData, "ek_idari"),
+            ["signatureDate"] = NormalizeDateInput(GetString(formData, "imzaTarihi")),
+            ["pageCount"] = GetString(formData, "sayfaSayisi") ?? "4 (Dört)",
+        };
+
+        AddCustomerPaymentFields(form, formData);
+
+        return JsonSerializer.Serialize(form);
+    }
+
+    private static void AddCustomerPaymentFields(
+        Dictionary<string, object?> form,
+        JsonElement formData)
+    {
+        var customerMilestones = GetArray(formData, "musteriHakedisler");
+
+        for (var index = 0; index < Math.Min(customerMilestones.Count, 4); index++)
+        {
+            var milestone = customerMilestones[index];
+            var fieldIndex = index + 1;
+
+            form[$"customerPaymentRate{fieldIndex}"] = GetString(milestone, "oran") ?? string.Empty;
+            form[$"customerPaymentAmount{fieldIndex}"] = string.Empty;
+            form[$"customerPaymentCondition{fieldIndex}"] = GetString(milestone, "sart") ?? string.Empty;
+            form[$"customerPaymentDueDays{fieldIndex}"] = GetString(milestone, "vade") ?? string.Empty;
+        }
     }
 
     private Company GetOrCreateCompany(
@@ -473,6 +623,42 @@ public sealed class JsonSeedService(
         return currency == "TL" ? "TRY" : currency;
     }
 
+    private static string? NormalizeDateInput(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var formats = new[] { "yyyy-MM-dd", "dd.MM.yyyy", "d.M.yyyy" };
+
+        return DateOnly.TryParseExact(
+            value,
+            formats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var date)
+            ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : value;
+    }
+
+    private static Dictionary<string, string> GetStringDictionary(JsonElement element, string propertyName)
+    {
+        var sourceObject = GetObject(element, propertyName);
+
+        if (sourceObject.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+
+        return sourceObject.EnumerateObject()
+            .ToDictionary(
+                property => property.Name,
+                property => property.Value.ValueKind == JsonValueKind.String
+                    ? property.Value.GetString() ?? string.Empty
+                    : property.Value.GetRawText());
+    }
+
     private static JsonElement GetObject(JsonElement element, string propertyName)
     {
         return element.ValueKind == JsonValueKind.Object && element.TryGetProperty(propertyName, out var value)
@@ -579,6 +765,23 @@ public sealed class JsonSeedService(
             : null;
     }
 
+    private static bool GetBool(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value))
+        {
+            return false;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number => value.TryGetInt32(out var numberValue) && numberValue != 0,
+            JsonValueKind.String => bool.TryParse(value.GetString(), out var boolValue) && boolValue,
+            _ => false,
+        };
+    }
+
     private static DateOnly? GetDate(JsonElement element, string propertyName)
     {
         var value = GetString(element, propertyName);
@@ -607,6 +810,7 @@ public sealed class JsonSeedService(
         public int CompaniesCreated { get; set; }
         public int ContractsCreated { get; set; }
         public int ContractsSkipped { get; set; }
+        public int ContractFormDataBackfilled { get; set; }
         public int MilestonesCreated { get; set; }
         public int PaymentTrackingsCreated { get; set; }
         public int ExpenseInvoicesCreated { get; set; }
