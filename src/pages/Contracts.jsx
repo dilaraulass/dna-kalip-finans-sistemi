@@ -32,6 +32,16 @@ const CONTRACT_TYPE_OPTIONS_BY_TAB = {
   musteri: ["OFT", "OFT-REV", "MP0", "FSN", "REV"],
 };
 
+const CONTRACT_ARCHIVE_STATUSES = {
+  active: "active",
+  archived: "archived",
+};
+
+const CONTRACT_ARCHIVE_STATUS_OPTIONS = [
+  { value: CONTRACT_ARCHIVE_STATUSES.active, label: "Aktif" },
+  { value: CONTRACT_ARCHIVE_STATUSES.archived, label: "Arşiv" },
+];
+
 const currencyFormatter = new Intl.NumberFormat("tr-TR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -364,6 +374,15 @@ function formatValue(value) {
   return value || "-";
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 function getContractTypeOptions(financeTab) {
   return (
     CONTRACT_TYPE_OPTIONS_BY_TAB[financeTab] ||
@@ -657,6 +676,9 @@ function ContractsPage() {
   const [error, setError] = useState("");
   const [searchText, setSearchText] = useState("");
   const [financeTabFilter, setFinanceTabFilter] = useState("all");
+  const [contractArchiveStatus, setContractArchiveStatus] = useState(
+    CONTRACT_ARCHIVE_STATUSES.active,
+  );
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [selectedContract, setSelectedContract] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -680,7 +702,10 @@ function ContractsPage() {
       try {
         setLoading(true);
         setError("");
-        const data = await getContracts({ signal: controller.signal });
+        const data = await getContracts({
+          archiveStatus: contractArchiveStatus,
+          signal: controller.signal,
+        });
         setContracts(data);
       } catch (requestError) {
         if (requestError.name !== "AbortError") {
@@ -696,7 +721,7 @@ function ContractsPage() {
     loadContracts();
 
     return () => controller.abort();
-  }, []);
+  }, [contractArchiveStatus]);
 
   const filteredContracts = useMemo(() => {
     const search = searchText.trim().toLocaleLowerCase("tr-TR");
@@ -740,61 +765,82 @@ function ContractsPage() {
     }),
     [contracts],
   );
+  const isArchivedView =
+    contractArchiveStatus === CONTRACT_ARCHIVE_STATUSES.archived;
+  const contractListTitle = isArchivedView
+    ? "Arşivlenmiş Sözleşmeler"
+    : "Sözleşmeler";
+  const contractListDescription = isArchivedView
+    ? `${filteredContracts.length} arşiv kaydı gösteriliyor`
+    : `${filteredContracts.length} kayıt gösteriliyor`;
 
-  const columns = [
-    {
-      field: "contractNumber",
-      headerName: "Sözleşme No",
-      width: 160,
-    },
-    {
-      field: "financeTab",
-      headerName: "Tür",
-      width: 115,
-      valueFormatter: (value) => formatFinanceTab(value),
-    },
-    {
-      field: "companyName",
-      headerName: "Firma",
-      width: 190,
-      valueFormatter: (value) => formatValue(value),
-    },
-    {
-      field: "workOrderNumber",
-      headerName: "İş Emri",
-      width: 110,
-      valueFormatter: (value) => formatValue(value),
-    },
-    {
-      field: "contractDate",
-      headerName: "Tarih",
-      width: 120,
-      valueFormatter: (value) => formatValue(value),
-    },
-    {
-      field: "totalAmount",
-      headerName: "Tutar",
-      width: 145,
-      valueFormatter: (value, row) => formatMoney(value, row.currency),
-    },
-    {
-      field: "milestoneCount",
-      headerName: "Hakediş",
-      width: 95,
-    },
-    {
-      field: "paidMilestoneCount",
-      headerName: "Ödenen",
-      width: 95,
-    },
-    {
-      field: "partName",
-      headerName: "Parça",
-      flex: 1,
-      minWidth: 160,
-      valueFormatter: (value) => formatValue(value),
-    },
-  ];
+  const columns = useMemo(() => {
+    const baseColumns = [
+      {
+        field: "contractNumber",
+        headerName: "Sözleşme No",
+        width: 160,
+      },
+      {
+        field: "financeTab",
+        headerName: "Tür",
+        width: 115,
+        valueFormatter: (value) => formatFinanceTab(value),
+      },
+      {
+        field: "companyName",
+        headerName: "Firma",
+        width: 190,
+        valueFormatter: (value) => formatValue(value),
+      },
+      {
+        field: "workOrderNumber",
+        headerName: "İş Emri",
+        width: 110,
+        valueFormatter: (value) => formatValue(value),
+      },
+      {
+        field: "contractDate",
+        headerName: "Tarih",
+        width: 120,
+        valueFormatter: (value) => formatValue(value),
+      },
+      {
+        field: "totalAmount",
+        headerName: "Tutar",
+        width: 145,
+        valueFormatter: (value, row) => formatMoney(value, row.currency),
+      },
+      {
+        field: "milestoneCount",
+        headerName: "Hakediş",
+        width: 95,
+      },
+      {
+        field: "paidMilestoneCount",
+        headerName: "Ödenen",
+        width: 95,
+      },
+      {
+        field: "partName",
+        headerName: "Parça",
+        flex: 1,
+        minWidth: 160,
+        valueFormatter: (value) => formatValue(value),
+      },
+    ];
+
+    if (contractArchiveStatus === CONTRACT_ARCHIVE_STATUSES.archived) {
+      baseColumns.splice(5, 0, {
+        field: "archivedAt",
+        headerName: "Arşiv Tarihi",
+        width: 150,
+        valueFormatter: (value) => formatDateTime(value),
+      });
+    }
+
+    return baseColumns;
+  }, [contractArchiveStatus]);
 
   async function handleContractSelect(contractId) {
     setSelectedContractId(contractId);
@@ -821,6 +867,13 @@ function ContractsPage() {
     setEditDrawerOpen(false);
     setEditError("");
     setArchiveError("");
+  }
+
+  function handleContractArchiveStatusChange(nextStatus) {
+    if (nextStatus === contractArchiveStatus) return;
+
+    closeDrawer();
+    setContractArchiveStatus(nextStatus);
   }
 
   function openCreateDrawer() {
@@ -890,8 +943,11 @@ function ContractsPage() {
 
     try {
       const createdContract = await createContract(payload);
-      const refreshedContracts = await getContracts();
+      const refreshedContracts = await getContracts({
+        archiveStatus: CONTRACT_ARCHIVE_STATUSES.active,
+      });
 
+      setContractArchiveStatus(CONTRACT_ARCHIVE_STATUSES.active);
       setContracts(refreshedContracts);
       setCreateDrawerOpen(false);
       setCreateForm(INITIAL_CONTRACT_FORM);
@@ -929,7 +985,9 @@ function ContractsPage() {
 
     try {
       const updatedContract = await updateContract(selectedContract.id, payload);
-      const refreshedContracts = await getContracts();
+      const refreshedContracts = await getContracts({
+        archiveStatus: contractArchiveStatus,
+      });
 
       setContracts(refreshedContracts);
       setSelectedContractId(updatedContract.id);
@@ -956,8 +1014,11 @@ function ContractsPage() {
 
     try {
       await archiveContract(selectedContract.id);
-      const refreshedContracts = await getContracts();
+      const refreshedContracts = await getContracts({
+        archiveStatus: CONTRACT_ARCHIVE_STATUSES.active,
+      });
 
+      setContractArchiveStatus(CONTRACT_ARCHIVE_STATUSES.active);
       setContracts(refreshedContracts);
       closeDrawer();
     } catch (requestError) {
@@ -1009,11 +1070,26 @@ function ContractsPage() {
       <div className="contracts-panel">
         <div className="contracts-header">
           <div>
-            <h2>Sözleşmeler</h2>
-            <p>{filteredContracts.length} kayıt gösteriliyor</p>
+            <h2>{contractListTitle}</h2>
+            <p>{contractListDescription}</p>
           </div>
 
           <div className="contracts-actions">
+            <div className="contracts-list-mode" aria-label="Sözleşme görünümü">
+              {CONTRACT_ARCHIVE_STATUS_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={
+                    contractArchiveStatus === option.value ? "active" : ""
+                  }
+                  onClick={() => handleContractArchiveStatusChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
             <button
               type="button"
               className="contracts-primary-btn"
@@ -1061,7 +1137,12 @@ function ContractsPage() {
                   paginationModel: { pageSize: 10, page: 0 },
                 },
                 sorting: {
-                  sortModel: [{ field: "contractDate", sort: "desc" }],
+                  sortModel: [
+                    {
+                      field: isArchivedView ? "archivedAt" : "contractDate",
+                      sort: "desc",
+                    },
+                  ],
                 },
               }}
               localeText={trTR.components.MuiDataGrid.defaultProps.localeText}
@@ -1101,6 +1182,7 @@ function ContractsPage() {
             onEdit={openEditDrawer}
             onArchive={handleArchiveContract}
             archiveSubmitting={archiveSubmitting}
+            isArchived={selectedContract.isArchived}
           />
         )}
       </Drawer>
@@ -2344,21 +2426,30 @@ function ContractDetail({
   onEdit,
   onArchive,
   archiveSubmitting,
+  isArchived,
 }) {
   return (
     <div className="contract-detail">
       <div className="contract-detail-actions">
-        <button
-          type="button"
-          className="contracts-danger-btn"
-          onClick={onArchive}
-          disabled={archiveSubmitting}
-        >
-          {archiveSubmitting ? "Arşivleniyor..." : "Arşivle"}
-        </button>
-        <button type="button" className="contracts-secondary-btn" onClick={onEdit}>
-          Düzenle
-        </button>
+        {!isArchived && (
+          <>
+            <button
+              type="button"
+              className="contracts-danger-btn"
+              onClick={onArchive}
+              disabled={archiveSubmitting}
+            >
+              {archiveSubmitting ? "Arşivleniyor..." : "Arşivle"}
+            </button>
+            <button
+              type="button"
+              className="contracts-secondary-btn"
+              onClick={onEdit}
+            >
+              Düzenle
+            </button>
+          </>
+        )}
         <button type="button" className="contracts-primary-btn" onClick={onPreview}>
           Sözleşme Önizle
         </button>
@@ -2375,6 +2466,12 @@ function ContractDetail({
           <DetailField label="Referans No" value={contract.referenceNumber} />
           <DetailField label="Proje No" value={contract.projectNumber} />
           <DetailField label="Parça" value={contract.partName} />
+          {isArchived && (
+            <DetailField
+              label="Arşiv Tarihi"
+              value={formatDateTime(contract.archivedAt)}
+            />
+          )}
           <DetailField label="Kalıp Sayısı" value={contract.moldCount} />
           <DetailField
             label="Sözleşme Bedeli"

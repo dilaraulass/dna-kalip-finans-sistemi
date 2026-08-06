@@ -36,8 +36,18 @@ async function request(path, options = {}) {
   return response.json();
 }
 
-export function getContracts({ signal } = {}) {
-  return request("/contracts", { signal });
+export function getContracts({ archiveStatus = "active", signal } = {}) {
+  const searchParams = new URLSearchParams();
+
+  if (archiveStatus) {
+    searchParams.set("archiveStatus", archiveStatus);
+  }
+
+  const queryString = searchParams.toString();
+
+  return request(`/contracts${queryString ? `?${queryString}` : ""}`, {
+    signal,
+  });
 }
 
 export function getContractById(id, { signal } = {}) {

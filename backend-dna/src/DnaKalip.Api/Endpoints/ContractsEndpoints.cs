@@ -15,12 +15,30 @@ public static class ContractsEndpoints
             .WithTags("Contracts");
 
         group.MapGet(string.Empty, async (
+            string? archiveStatus,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
-            var contracts = await db.Contracts
-                .AsNoTracking()
-                .Where(contract => !contract.IsArchived)
+            var normalizedArchiveStatus = (archiveStatus ?? "active").Trim().ToLowerInvariant();
+
+            if (normalizedArchiveStatus is not ("active" or "archived" or "all"))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["archiveStatus"] = ["archiveStatus active, archived veya all olmalıdır."],
+                });
+            }
+
+            var query = db.Contracts.AsNoTracking();
+
+            query = normalizedArchiveStatus switch
+            {
+                "active" => query.Where(contract => !contract.IsArchived),
+                "archived" => query.Where(contract => contract.IsArchived),
+                _ => query,
+            };
+
+            var contracts = await query
                 .OrderByDescending(contract => contract.ContractDate)
                 .ThenBy(contract => contract.ContractNumber)
                 .Select(contract => new ContractListItemResponse(
