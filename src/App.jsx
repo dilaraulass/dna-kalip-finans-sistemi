@@ -1,9 +1,10 @@
 import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 import Finance from "./pages/Finance";
 import Contracts from "./pages/Contracts";
+import Companies from "./pages/Companies";
 import PaymentTracking from "./pages/PaymentTracking";
 import logo from "./assets/logo.png";
-import { FaFileContract } from "react-icons/fa";
+import { FaBuilding, FaFileContract } from "react-icons/fa";
 import { FaMoneyBillTrendUp } from "react-icons/fa6";
 import { HiBars3 } from "react-icons/hi2";
 import { useState } from "react";
@@ -42,6 +43,11 @@ function App() {
             {sidebarOpen && <span>Sözleşmeler</span>}
           </NavLink>
 
+          <NavLink to="/companies" className="menu-item">
+            <FaBuilding size={20} />
+            {sidebarOpen && <span>Firmalar</span>}
+          </NavLink>
+
         </nav>
 
        
@@ -58,6 +64,7 @@ function App() {
           <Route path="/" element={<Navigate to="/finance" replace />} />
           <Route path="/finance" element={<Finance />} />
           <Route path="/contracts" element={<Contracts />} />
+          <Route path="/companies" element={<Companies />} />
           <Route path="/payments" element={<PaymentTracking />} />
         </Routes>
       </main>

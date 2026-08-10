@@ -55,6 +55,7 @@ app.MapGet("/health", () => Results.Ok(new
 .WithName("GetHealth");
 
 app.MapContractsEndpoints();
+app.MapCompaniesEndpoints();
 app.MapFinanceEndpoints();
 
 app.Run();
