@@ -8,6 +8,7 @@ import {
   createContract,
   getContractById,
   getContracts,
+  restoreContract,
   updateContract,
 } from "../services/contractsApi";
 import logo from "../assets/logo.png";
@@ -1029,6 +1030,34 @@ function ContractsPage() {
     }
   }
 
+  async function handleRestoreContract() {
+    if (!selectedContract || archiveSubmitting) return;
+
+    const confirmed = window.confirm(
+      `${selectedContract.contractNumber} numaralı sözleşme arşivden çıkarılacak ve aktif listeye geri alınacak. Devam edilsin mi?`,
+    );
+
+    if (!confirmed) return;
+
+    setArchiveSubmitting(true);
+    setArchiveError("");
+
+    try {
+      await restoreContract(selectedContract.id);
+      const refreshedContracts = await getContracts({
+        archiveStatus: CONTRACT_ARCHIVE_STATUSES.active,
+      });
+
+      setContractArchiveStatus(CONTRACT_ARCHIVE_STATUSES.active);
+      setContracts(refreshedContracts);
+      closeDrawer();
+    } catch (requestError) {
+      setArchiveError(requestError.message || "Sözleşme arşivden çıkarılamadı.");
+    } finally {
+      setArchiveSubmitting(false);
+    }
+  }
+
   return (
     <section className="contracts-page">
       <div className="contracts-summary-grid">
@@ -1182,6 +1211,7 @@ function ContractsPage() {
             onPreview={openPreviewDrawer}
             onEdit={openEditDrawer}
             onArchive={handleArchiveContract}
+            onRestore={handleRestoreContract}
             archiveSubmitting={archiveSubmitting}
             isArchived={selectedContract.isArchived}
           />
@@ -2441,6 +2471,7 @@ function ContractDetail({
   onPreview,
   onEdit,
   onArchive,
+  onRestore,
   archiveSubmitting,
   isArchived,
 }) {
@@ -2465,6 +2496,16 @@ function ContractDetail({
               Düzenle
             </button>
           </>
+        )}
+        {isArchived && (
+          <button
+            type="button"
+            className="contracts-secondary-btn"
+            onClick={onRestore}
+            disabled={archiveSubmitting}
+          >
+            {archiveSubmitting ? "Geri alınıyor..." : "Arşivden Çıkar"}
+          </button>
         )}
         <button type="button" className="contracts-primary-btn" onClick={onPreview}>
           Sözleşme Önizle

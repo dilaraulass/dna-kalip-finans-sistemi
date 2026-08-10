@@ -329,6 +329,33 @@ public static class ContractsEndpoints
         })
         .WithName("ArchiveContract");
 
+        group.MapPatch("/{id:guid}/restore", async (
+            Guid id,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var contract = await db.Contracts
+                .FirstOrDefaultAsync(
+                    item => item.Id == id,
+                    cancellationToken);
+
+            if (contract is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (contract.IsArchived)
+            {
+                contract.IsArchived = false;
+                contract.ArchivedAt = null;
+
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("RestoreContract");
+
         return app;
     }
 

@@ -82,3 +82,10 @@ export function archiveContract(id, { signal } = {}) {
     signal,
   });
 }
+
+export function restoreContract(id, { signal } = {}) {
+  return request(`/contracts/${id}/restore`, {
+    method: "PATCH",
+    signal,
+  });
+}
