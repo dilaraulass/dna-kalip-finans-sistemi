@@ -35,6 +35,7 @@ function ExpenseInvoiceTable({
   selectedRowId,
   setSelectedRow,
   setSelectedRowId,
+  onCreateInvoice,
 }) {
   const columns = [
     { field: "workOrder", headerName: "İş Emri", width: 110 },
@@ -71,13 +72,22 @@ function ExpenseInvoiceTable({
           <p>{rows.length} fatura kaydı gösteriliyor</p>
         </div>
 
-        <input
-          className="table-search"
-          type="text"
-          placeholder="Firma, gider türü veya iş emri ara..."
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-        />
+        <div className="table-header-actions">
+          <input
+            className="table-search"
+            type="text"
+            placeholder="Firma, gider türü veya iş emri ara..."
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+          />
+          <button
+            type="button"
+            className="finance-primary-btn"
+            onClick={onCreateInvoice}
+          >
+            Yeni Fatura
+          </button>
+        </div>
       </div>
 
       <div className="finance-filters">

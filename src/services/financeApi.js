@@ -58,6 +58,17 @@ export function updatePaymentTracking(milestoneId, payload, { signal } = {}) {
   });
 }
 
+export function createExpenseInvoice(payload, { signal } = {}) {
+  return request("/expense-invoices", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
 export function updateExpenseInvoice(invoiceId, payload, { signal } = {}) {
   return request(`/expense-invoices/${invoiceId}`, {
     method: "PUT",
@@ -65,6 +76,13 @@ export function updateExpenseInvoice(invoiceId, payload, { signal } = {}) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+export function archiveExpenseInvoice(invoiceId, { signal } = {}) {
+  return request(`/expense-invoices/${invoiceId}/archive`, {
+    method: "PATCH",
     signal,
   });
 }

@@ -249,6 +249,9 @@ namespace DnaKalip.Api.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -272,6 +275,11 @@ namespace DnaKalip.Api.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<DateOnly?>("PaymentDate")
                         .HasColumnType("date");
 
@@ -287,6 +295,8 @@ namespace DnaKalip.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InvoiceDate");
+
+                    b.HasIndex("IsArchived");
 
                     b.HasIndex("WorkOrderNumber");
 

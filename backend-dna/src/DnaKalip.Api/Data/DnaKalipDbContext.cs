@@ -93,9 +93,11 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
             entity.Property(invoice => invoice.Amount).HasPrecision(18, 2);
             entity.Property(invoice => invoice.Currency).HasMaxLength(3).IsRequired();
             entity.Property(invoice => invoice.Status).HasMaxLength(25).IsRequired();
+            entity.Property(invoice => invoice.IsArchived).HasDefaultValue(false);
 
             entity.HasIndex(invoice => invoice.WorkOrderNumber);
             entity.HasIndex(invoice => invoice.InvoiceDate);
+            entity.HasIndex(invoice => invoice.IsArchived);
         });
 
         modelBuilder.Entity<ExchangeRate>(entity =>

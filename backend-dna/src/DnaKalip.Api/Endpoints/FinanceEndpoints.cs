@@ -109,6 +109,7 @@ public static class FinanceEndpoints
 
             var expenseInvoices = await db.ExpenseInvoices
                 .AsNoTracking()
+                .Where(invoice => !invoice.IsArchived)
                 .OrderBy(invoice => invoice.InvoiceDate)
                 .ThenBy(invoice => invoice.WorkOrderNumber)
                 .Select(invoice => new
@@ -233,13 +234,59 @@ public static class FinanceEndpoints
         .WithTags("Finance")
         .WithName("UpdatePaymentTracking");
 
+        app.MapPost("/api/expense-invoices", async (
+            CreateExpenseInvoiceRequest request,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var validationErrors = ValidateExpenseInvoiceRequest(
+                request.Description,
+                request.Amount,
+                request.Currency,
+                request.DueDays,
+                request.Status);
+
+            if (validationErrors.Count > 0)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            var invoice = new ExpenseInvoice
+            {
+                WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber),
+                InvoiceType = NormalizeOptional(request.InvoiceType),
+                Description = request.Description.Trim(),
+                Amount = request.Amount,
+                Currency = NormalizeCurrency(request.Currency),
+                InvoiceDate = request.InvoiceDate,
+                DueDays = request.DueDays,
+                PaymentDate = request.PaymentDate,
+                Status = request.Status.Trim().ToLowerInvariant(),
+            };
+
+            db.ExpenseInvoices.Add(invoice);
+            await db.SaveChangesAsync(cancellationToken);
+
+            return Results.Created($"/api/expense-invoices/{invoice.Id}", new
+            {
+                invoice.Id,
+            });
+        })
+        .WithTags("Finance")
+        .WithName("CreateExpenseInvoice");
+
         app.MapPut("/api/expense-invoices/{id:guid}", async (
             Guid id,
             UpdateExpenseInvoiceRequest request,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
-            var validationErrors = ValidateExpenseInvoiceRequest(request);
+            var validationErrors = ValidateExpenseInvoiceRequest(
+                request.Description,
+                request.Amount,
+                request.Currency,
+                request.DueDays,
+                request.Status);
 
             if (validationErrors.Count > 0)
             {
@@ -273,6 +320,34 @@ public static class FinanceEndpoints
         .WithTags("Finance")
         .WithName("UpdateExpenseInvoice");
 
+        app.MapPatch("/api/expense-invoices/{id:guid}/archive", async (
+            Guid id,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var invoice = await db.ExpenseInvoices
+                .FirstOrDefaultAsync(
+                    item => item.Id == id,
+                    cancellationToken);
+
+            if (invoice is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!invoice.IsArchived)
+            {
+                invoice.IsArchived = true;
+                invoice.ArchivedAt = DateTimeOffset.UtcNow;
+
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            return Results.NoContent();
+        })
+        .WithTags("Finance")
+        .WithName("ArchiveExpenseInvoice");
+
         return app;
     }
 
@@ -296,18 +371,22 @@ public static class FinanceEndpoints
     }
 
     private static Dictionary<string, string[]> ValidateExpenseInvoiceRequest(
-        UpdateExpenseInvoiceRequest request)
+        string? description,
+        decimal amount,
+        string? currencyValue,
+        int dueDays,
+        string? statusValue)
     {
         var errors = new Dictionary<string, string[]>();
-        var currency = request.Currency?.Trim().ToUpperInvariant();
-        var status = request.Status?.Trim().ToLowerInvariant();
+        var currency = currencyValue?.Trim().ToUpperInvariant();
+        var status = statusValue?.Trim().ToLowerInvariant();
 
-        if (string.IsNullOrWhiteSpace(request.Description))
+        if (string.IsNullOrWhiteSpace(description))
         {
             errors["description"] = ["Açıklama zorunludur."];
         }
 
-        if (request.Amount < 0)
+        if (amount < 0)
         {
             errors["amount"] = ["Tutar negatif olamaz."];
         }
@@ -317,7 +396,7 @@ public static class FinanceEndpoints
             errors["currency"] = ["Para birimi TRY, EUR veya USD olmalıdır."];
         }
 
-        if (request.DueDays < 0)
+        if (dueDays < 0)
         {
             errors["dueDays"] = ["Vade negatif olamaz."];
         }

@@ -28,9 +28,13 @@ function ExpenseDetail({
   displayCurrency,
   error = "",
   saving = false,
+  archiving = false,
+  mode = "edit",
   onSave,
+  onArchive,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
+  const isCreateMode = mode === "create";
 
   if (!selectedRow) return null;
 
@@ -61,87 +65,91 @@ function ExpenseDetail({
 
   return (
     <div className="finance-detail">
-      <div className="finance-detail-status">
-        <span className={`status-badge ${selectedRow.statusKey}`}>
-          {selectedRow.status}
-          {selectedRow.daysUntilDue !== null &&
-            selectedRow.statusKey !== PAYMENT_STATUSES.paid &&
-            ` (${Math.abs(selectedRow.daysUntilDue)} gün)`}
-        </span>
-      </div>
-
-      <div className="finance-detail-section">
-        <h3>Fatura Bilgileri</h3>
-
-        <div className="finance-detail-grid">
-          <div>
-            <span>Firma / Açıklama</span>
-            <strong>{selectedRow.company}</strong>
+      {!isCreateMode && (
+        <>
+          <div className="finance-detail-status">
+            <span className={`status-badge ${selectedRow.statusKey}`}>
+              {selectedRow.status}
+              {selectedRow.daysUntilDue !== null &&
+                selectedRow.statusKey !== PAYMENT_STATUSES.paid &&
+                ` (${Math.abs(selectedRow.daysUntilDue)} gün)`}
+            </span>
           </div>
 
-          <div>
-            <span>İş Emri</span>
-            <strong>{selectedRow.workOrder}</strong>
+          <div className="finance-detail-section">
+            <h3>Fatura Bilgileri</h3>
+
+            <div className="finance-detail-grid">
+              <div>
+                <span>Firma / Açıklama</span>
+                <strong>{selectedRow.company}</strong>
+              </div>
+
+              <div>
+                <span>İş Emri</span>
+                <strong>{selectedRow.workOrder}</strong>
+              </div>
+
+              <div>
+                <span>Gider Türü</span>
+                <strong>{selectedRow.invoiceType}</strong>
+              </div>
+
+              <div>
+                <span>Tutar</span>
+                <strong>
+                  {formatMoney(selectedRow.convertedAmount, displayCurrency)}
+                </strong>
+              </div>
+
+              <div>
+                <span>Orijinal Para Birimi</span>
+                <strong>{selectedRow.currency}</strong>
+              </div>
+
+              <div>
+                <span>Vade</span>
+                <strong>{selectedRow.dueDays} gün</strong>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <span>Gider Türü</span>
-            <strong>{selectedRow.invoiceType}</strong>
-          </div>
+          <div className="finance-detail-section">
+            <h3>Tarih Bilgileri</h3>
 
-          <div>
-            <span>Tutar</span>
-            <strong>
-              {formatMoney(selectedRow.convertedAmount, displayCurrency)}
-            </strong>
-          </div>
+            <div className="finance-detail-grid">
+              <div>
+                <span>Fatura Tarihi</span>
+                <strong>{selectedRow.invoiceDate || "-"}</strong>
+              </div>
 
-          <div>
-            <span>Orijinal Para Birimi</span>
-            <strong>{selectedRow.currency}</strong>
-          </div>
+              <div>
+                <span>Ödeme Tarihi</span>
+                <strong>{selectedRow.paymentDate || "-"}</strong>
+              </div>
 
-          <div>
-            <span>Vade</span>
-            <strong>{selectedRow.dueDays} gün</strong>
-          </div>
-        </div>
-      </div>
+              <div>
+                <span>Hesaplanan Vade Tarihi</span>
+                <strong>{selectedRow.expectedPaymentDate || "-"}</strong>
+              </div>
 
-      <div className="finance-detail-section">
-        <h3>Tarih Bilgileri</h3>
-
-        <div className="finance-detail-grid">
-          <div>
-            <span>Fatura Tarihi</span>
-            <strong>{selectedRow.invoiceDate || "-"}</strong>
+              <div>
+                <span>Tarih Farkı</span>
+                <strong>
+                  {selectedRow.paymentDateDifference
+                    ? `${selectedRow.paymentDateDifference > 0 ? "+" : ""}${
+                        selectedRow.paymentDateDifference
+                      } gün`
+                    : "Yok"}
+                </strong>
+              </div>
+            </div>
           </div>
-
-          <div>
-            <span>Ödeme Tarihi</span>
-            <strong>{selectedRow.paymentDate || "-"}</strong>
-          </div>
-
-          <div>
-            <span>Hesaplanan Vade Tarihi</span>
-            <strong>{selectedRow.expectedPaymentDate || "-"}</strong>
-          </div>
-
-          <div>
-            <span>Tarih Farkı</span>
-            <strong>
-              {selectedRow.paymentDateDifference
-                ? `${selectedRow.paymentDateDifference > 0 ? "+" : ""}${
-                    selectedRow.paymentDateDifference
-                  } gün`
-                : "Yok"}
-            </strong>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <form className="finance-detail-section" onSubmit={handleSubmit}>
-        <h3>Fatura Bilgilerini Güncelle</h3>
+        <h3>{isCreateMode ? "Yeni Fatura Bilgisi" : "Fatura Bilgilerini Güncelle"}</h3>
 
         {error && <div className="finance-detail-error">{error}</div>}
 
@@ -153,6 +161,7 @@ function ExpenseDetail({
               value={form.description}
               onChange={handleChange}
               rows={3}
+              required
             />
           </label>
 
@@ -185,6 +194,7 @@ function ExpenseDetail({
               step="0.01"
               value={form.amount}
               onChange={handleChange}
+              required
             />
           </label>
 
@@ -206,6 +216,7 @@ function ExpenseDetail({
               name="invoiceDate"
               value={form.invoiceDate}
               onChange={handleChange}
+              required
             />
           </label>
 
@@ -246,10 +257,20 @@ function ExpenseDetail({
           <button
             type="submit"
             className="detail-btn primary"
-            disabled={saving}
+            disabled={saving || archiving}
           >
-            {saving ? "Kaydediliyor..." : "Kaydet"}
+            {saving ? "Kaydediliyor..." : isCreateMode ? "Fatura Ekle" : "Kaydet"}
           </button>
+          {!isCreateMode && (
+            <button
+              type="button"
+              className="detail-btn danger"
+              onClick={onArchive}
+              disabled={saving || archiving}
+            >
+              {archiving ? "Arşivleniyor..." : "Arşivle"}
+            </button>
+          )}
         </div>
       </form>
     </div>

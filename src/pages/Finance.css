@@ -106,6 +106,14 @@
   font-size: 14px;
 }
 
+.table-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .table-search {
   width: 320px;
   padding: 11px 14px;
@@ -116,6 +124,21 @@
 
 .table-search:focus {
   border-color: #2563eb;
+}
+
+.finance-primary-btn {
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.finance-primary-btn:hover {
+  background: #1d4ed8;
 }
 
 .stat-card.all,

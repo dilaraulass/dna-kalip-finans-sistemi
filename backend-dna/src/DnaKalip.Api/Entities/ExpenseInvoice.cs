@@ -12,5 +12,7 @@ public class ExpenseInvoice
     public int DueDays { get; set; }
     public DateOnly? PaymentDate { get; set; }
     public string Status { get; set; } = "pending";
+    public bool IsArchived { get; set; }
+    public DateTimeOffset? ArchivedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

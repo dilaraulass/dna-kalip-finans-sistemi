@@ -4,6 +4,8 @@ import {
   convertAmount,
 } from "../services/financeService";
 import {
+  archiveExpenseInvoice,
+  createExpenseInvoice,
   getFinanceDashboard,
   updateExpenseInvoice,
   updatePaymentTracking,
@@ -27,6 +29,26 @@ import {
   STATUS_FILTERS,
 } from "../constants/financeConstants";
 
+const NEW_EXPENSE_INVOICE_ROW = {
+  id: "new-expense-invoice",
+  isNew: true,
+  workOrder: "",
+  invoiceType: "",
+  company: "",
+  amount: 0,
+  convertedAmount: 0,
+  currency: CURRENCIES.try,
+  invoiceDate: "",
+  dueDays: 0,
+  paymentDate: "",
+  expectedPaymentDate: "",
+  paymentDateDifference: null,
+  paymentStatus: "pending",
+  statusKey: "pending",
+  status: "Bekleyen",
+  daysUntilDue: null,
+};
+
 function Finance() {
   const [financeData, setFinanceData] = useState({
     paymentMilestones: [],
@@ -37,6 +59,7 @@ function Finance() {
   const [error, setError] = useState("");
   const [detailUpdateError, setDetailUpdateError] = useState("");
   const [detailUpdateSubmitting, setDetailUpdateSubmitting] = useState(false);
+  const [detailArchiveSubmitting, setDetailArchiveSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState(FINANCE_MODULES.supplier);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState(STATUS_KEYS.all);
@@ -343,6 +366,7 @@ function Finance() {
     setSelectedRow(null);
     setSelectedRowId(null);
     setDetailUpdateError("");
+    setDetailArchiveSubmitting(false);
   };
 
   async function handlePaymentTrackingSave(payload) {
@@ -370,7 +394,13 @@ function Finance() {
     try {
       setDetailUpdateSubmitting(true);
       setDetailUpdateError("");
-      await updateExpenseInvoice(selectedRow.id, payload);
+
+      if (selectedRow.isNew) {
+        await createExpenseInvoice(payload);
+      } else {
+        await updateExpenseInvoice(selectedRow.id, payload);
+      }
+
       await loadFinanceDashboard();
       setSelectedRow(null);
       setSelectedRowId(null);
@@ -380,6 +410,37 @@ function Finance() {
       );
     } finally {
       setDetailUpdateSubmitting(false);
+    }
+  }
+
+  function handleCreateExpenseInvoice() {
+    setDetailUpdateError("");
+    setSelectedRow({ ...NEW_EXPENSE_INVOICE_ROW });
+    setSelectedRowId(null);
+  }
+
+  async function handleExpenseInvoiceArchive() {
+    if (!selectedRow || selectedRow.isNew || detailArchiveSubmitting) return;
+
+    const confirmed = window.confirm(
+      `${selectedRow.company} faturası arşivlenecek. Arşivlenen fatura finans toplamlarına dahil edilmez. Devam edilsin mi?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDetailArchiveSubmitting(true);
+      setDetailUpdateError("");
+      await archiveExpenseInvoice(selectedRow.id);
+      await loadFinanceDashboard();
+      setSelectedRow(null);
+      setSelectedRowId(null);
+    } catch (requestError) {
+      setDetailUpdateError(
+        requestError.message || "Fatura arşivlenemedi.",
+      );
+    } finally {
+      setDetailArchiveSubmitting(false);
     }
   }
 
@@ -445,6 +506,7 @@ function Finance() {
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
+              onCreateInvoice={handleCreateExpenseInvoice}
             />
           )}
           {activeTab === FINANCE_MODULES.expenses && (
@@ -496,8 +558,15 @@ function Finance() {
         onClose={() => {
           setSelectedRow(null);
           setDetailUpdateError("");
+          setDetailArchiveSubmitting(false);
         }}
-        title={expenseModule ? "Fatura Detayı" : `${transactionLabel} Detayı`}
+        title={
+          expenseModule && selectedRow?.isNew
+            ? "Yeni Fatura"
+            : expenseModule
+              ? "Fatura Detayı"
+              : `${transactionLabel} Detayı`
+        }
         subtitle={
           expenseModule ? selectedRow?.company : selectedRow?.contractNumber
         }
@@ -510,7 +579,10 @@ function Finance() {
             displayCurrency={displayCurrency}
             error={detailUpdateError}
             saving={detailUpdateSubmitting}
+            archiving={detailArchiveSubmitting}
+            mode={selectedRow?.isNew ? "create" : "edit"}
             onSave={handleExpenseInvoiceSave}
+            onArchive={handleExpenseInvoiceArchive}
           />
         ) : (
           <FinanceDetail
