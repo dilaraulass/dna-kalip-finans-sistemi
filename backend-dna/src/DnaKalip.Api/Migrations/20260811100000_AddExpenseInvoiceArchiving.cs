@@ -1,4 +1,6 @@
 using System;
+using DnaKalip.Api.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,6 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DnaKalip.Api.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(DnaKalipDbContext))]
     [Migration("20260811100000_AddExpenseInvoiceArchiving")]
     public partial class AddExpenseInvoiceArchiving : Migration
     {
