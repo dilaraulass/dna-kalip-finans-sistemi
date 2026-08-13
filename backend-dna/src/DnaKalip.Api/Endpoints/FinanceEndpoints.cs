@@ -184,6 +184,98 @@ public static class FinanceEndpoints
         })
         .WithName("GetFinanceDashboard");
 
+        group.MapGet("/exchange-rates", async (
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var exchangeRateRows = await db.ExchangeRates
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+            var latestRates = exchangeRateRows
+                .GroupBy(rate => NormalizeCurrency(rate.Currency))
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .OrderByDescending(rate => rate.EffectiveDate)
+                        .ThenByDescending(rate => rate.CreatedAt)
+                        .First());
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var rates = new List<ExchangeRateResponse>
+            {
+                new(
+                    Currencies.Try,
+                    1,
+                    today,
+                    DateTimeOffset.UtcNow),
+            };
+
+            foreach (var currency in new[] { Currencies.Eur, Currencies.Usd })
+            {
+                if (latestRates.TryGetValue(currency, out var rate))
+                {
+                    rates.Add(new ExchangeRateResponse(
+                        NormalizeCurrency(rate.Currency),
+                        rate.RateToTry,
+                        rate.EffectiveDate,
+                        rate.CreatedAt));
+                }
+            }
+
+            return Results.Ok(rates);
+        })
+        .WithName("GetExchangeRates");
+
+        group.MapPut("/exchange-rates/{currency}", async (
+            string currency,
+            UpsertExchangeRateRequest request,
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var normalizedCurrency = NormalizeCurrency(currency);
+            var validationErrors = ValidateExchangeRateRequest(
+                normalizedCurrency,
+                request);
+
+            if (validationErrors.Count > 0)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            var effectiveDate = request.EffectiveDate ??
+                DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var exchangeRate = await db.ExchangeRates
+                .FirstOrDefaultAsync(
+                    item =>
+                        item.Currency == normalizedCurrency &&
+                        item.EffectiveDate == effectiveDate,
+                    cancellationToken);
+
+            if (exchangeRate is null)
+            {
+                exchangeRate = new ExchangeRate
+                {
+                    Currency = normalizedCurrency,
+                    EffectiveDate = effectiveDate,
+                };
+
+                db.ExchangeRates.Add(exchangeRate);
+            }
+
+            exchangeRate.RateToTry = request.RateToTry;
+
+            await db.SaveChangesAsync(cancellationToken);
+
+            return Results.Ok(new ExchangeRateResponse(
+                exchangeRate.Currency,
+                exchangeRate.RateToTry,
+                exchangeRate.EffectiveDate,
+                exchangeRate.CreatedAt));
+        })
+        .WithName("UpsertExchangeRate");
+
         app.MapPut("/api/contract-milestones/{milestoneId:guid}/payment-tracking", async (
             Guid milestoneId,
             UpdatePaymentTrackingRequest request,
@@ -404,6 +496,25 @@ public static class FinanceEndpoints
         if (status is not (PaymentStatuses.Paid or PaymentStatuses.Pending))
         {
             errors["status"] = ["Durum paid veya pending olmalıdır."];
+        }
+
+        return errors;
+    }
+
+    private static Dictionary<string, string[]> ValidateExchangeRateRequest(
+        string currency,
+        UpsertExchangeRateRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (currency is not (Currencies.Eur or Currencies.Usd))
+        {
+            errors["currency"] = ["Sadece EUR ve USD kuru güncellenebilir. TRY temel para birimidir."];
+        }
+
+        if (request.RateToTry <= 0)
+        {
+            errors["rateToTry"] = ["Kur değeri sıfırdan büyük olmalıdır."];
         }
 
         return errors;

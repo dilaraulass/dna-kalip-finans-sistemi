@@ -7,11 +7,13 @@ import {
   archiveExpenseInvoice,
   createExpenseInvoice,
   getFinanceDashboard,
+  updateExchangeRate,
   updateExpenseInvoice,
   updatePaymentTracking,
 } from "../services/financeApi";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
+import ExchangeRateSettings from "../components/Finance/ExchangeRateSettings";
 import ExpenseInvoiceTable from "../components/Finance/ExpenseInvoiceTable";
 import FinancialAnalysis from "../components/Finance/FinancialAnalysis";
 import FinanceStatusCards from "../components/Finance/FinanceStatusCards";
@@ -49,6 +51,22 @@ const NEW_EXPENSE_INVOICE_ROW = {
   daysUntilDue: null,
 };
 
+const DEFAULT_EXCHANGE_RATE_FORM = {
+  [CURRENCIES.eur]: "",
+  [CURRENCIES.usd]: "",
+};
+
+function buildExchangeRateForm(exchangeRates) {
+  return {
+    [CURRENCIES.eur]: String(exchangeRates?.[CURRENCIES.eur] ?? ""),
+    [CURRENCIES.usd]: String(exchangeRates?.[CURRENCIES.usd] ?? ""),
+  };
+}
+
+function parseRateInput(value) {
+  return Number.parseFloat(String(value).replace(",", "."));
+}
+
 function Finance() {
   const [financeData, setFinanceData] = useState({
     paymentMilestones: [],
@@ -60,6 +78,11 @@ function Finance() {
   const [detailUpdateError, setDetailUpdateError] = useState("");
   const [detailUpdateSubmitting, setDetailUpdateSubmitting] = useState(false);
   const [detailArchiveSubmitting, setDetailArchiveSubmitting] = useState(false);
+  const [exchangeRateForm, setExchangeRateForm] = useState(
+    DEFAULT_EXCHANGE_RATE_FORM,
+  );
+  const [exchangeRateError, setExchangeRateError] = useState("");
+  const [exchangeRateSubmitting, setExchangeRateSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState(FINANCE_MODULES.supplier);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState(STATUS_KEYS.all);
@@ -82,11 +105,14 @@ function Finance() {
       setLoading(true);
       setError("");
       const data = await getFinanceDashboard({ signal });
+      const exchangeRates = data.exchangeRates || DEFAULT_EXCHANGE_RATES;
+
       setFinanceData({
         paymentMilestones: data.paymentMilestones || [],
         expenseInvoices: data.expenseInvoices || [],
-        exchangeRates: data.exchangeRates || DEFAULT_EXCHANGE_RATES,
+        exchangeRates,
       });
+      setExchangeRateForm(buildExchangeRateForm(exchangeRates));
     } catch (requestError) {
       if (requestError.name !== "AbortError") {
         setError("Finans verileri yüklenirken bir hata oluştu.");
@@ -444,6 +470,50 @@ function Finance() {
     }
   }
 
+  function handleExchangeRateChange(event) {
+    const { name, value } = event.target;
+
+    setExchangeRateForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+    }));
+  }
+
+  async function handleExchangeRateSubmit(event) {
+    event.preventDefault();
+
+    const eurRate = parseRateInput(exchangeRateForm[CURRENCIES.eur]);
+    const usdRate = parseRateInput(exchangeRateForm[CURRENCIES.usd]);
+
+    if (!Number.isFinite(eurRate) || eurRate <= 0) {
+      setExchangeRateError("EUR kuru sıfırdan büyük olmalıdır.");
+      return;
+    }
+
+    if (!Number.isFinite(usdRate) || usdRate <= 0) {
+      setExchangeRateError("USD kuru sıfırdan büyük olmalıdır.");
+      return;
+    }
+
+    try {
+      setExchangeRateSubmitting(true);
+      setExchangeRateError("");
+
+      await Promise.all([
+        updateExchangeRate(CURRENCIES.eur, { rateToTry: eurRate }),
+        updateExchangeRate(CURRENCIES.usd, { rateToTry: usdRate }),
+      ]);
+
+      await loadFinanceDashboard();
+    } catch (requestError) {
+      setExchangeRateError(
+        requestError.message || "Kur bilgileri güncellenemedi.",
+      );
+    } finally {
+      setExchangeRateSubmitting(false);
+    }
+  }
+
   const paymentModule =
     activeTab === FINANCE_MODULES.supplier ||
     activeTab === FINANCE_MODULES.customer;
@@ -482,6 +552,16 @@ function Finance() {
       )}
 
       {!loading && !error && (
+        <ExchangeRateSettings
+          form={exchangeRateForm}
+          error={exchangeRateError}
+          saving={exchangeRateSubmitting}
+          onChange={handleExchangeRateChange}
+          onSubmit={handleExchangeRateSubmit}
+        />
+      )}
+
+      {!loading && !error && (
         <div className="dashboard-section">
           {paymentModule && (
             <PaymentMilestoneTable
@@ -506,7 +586,6 @@ function Finance() {
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
-              onCreateInvoice={handleCreateExpenseInvoice}
             />
           )}
           {activeTab === FINANCE_MODULES.expenses && (
@@ -535,6 +614,7 @@ function Finance() {
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
+              onCreateInvoice={handleCreateExpenseInvoice}
             />
           )}
           {activeTab === FINANCE_MODULES.analysis && (

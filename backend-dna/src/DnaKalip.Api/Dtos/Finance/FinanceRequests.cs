@@ -6,6 +6,10 @@ public sealed record UpdatePaymentTrackingRequest(
     string Status,
     int? DueDaysOverride);
 
+public sealed record UpsertExchangeRateRequest(
+    decimal RateToTry,
+    DateOnly? EffectiveDate);
+
 public sealed record CreateExpenseInvoiceRequest(
     string? WorkOrderNumber,
     string? InvoiceType,

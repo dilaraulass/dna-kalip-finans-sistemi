@@ -5,6 +5,12 @@ public sealed record FinanceDashboardResponse(
     IReadOnlyCollection<FinanceExpenseInvoiceResponse> ExpenseInvoices,
     IReadOnlyDictionary<string, decimal> ExchangeRates);
 
+public sealed record ExchangeRateResponse(
+    string Currency,
+    decimal RateToTry,
+    DateOnly EffectiveDate,
+    DateTimeOffset CreatedAt);
+
 public sealed record FinancePaymentMilestoneResponse(
     Guid Id,
     Guid ContractId,

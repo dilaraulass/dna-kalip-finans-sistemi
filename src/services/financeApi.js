@@ -47,6 +47,21 @@ export function getFinanceDashboard({ signal } = {}) {
   return request("/finance/dashboard", { signal });
 }
 
+export function getExchangeRates({ signal } = {}) {
+  return request("/finance/exchange-rates", { signal });
+}
+
+export function updateExchangeRate(currency, payload, { signal } = {}) {
+  return request(`/finance/exchange-rates/${currency}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
 export function updatePaymentTracking(milestoneId, payload, { signal } = {}) {
   return request(`/contract-milestones/${milestoneId}/payment-tracking`, {
     method: "PUT",

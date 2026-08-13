@@ -89,6 +89,74 @@
   border-color: #111827;
 }
 
+.exchange-rate-settings {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 18px;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.exchange-rate-settings h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+}
+
+.exchange-rate-settings p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.exchange-rate-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.exchange-rate-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.exchange-rate-fields input {
+  width: 130px;
+  height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: white;
+  color: #0f172a;
+  font: inherit;
+}
+
+.exchange-rate-fields input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.exchange-rate-error {
+  align-self: flex-end;
+  padding: 10px 12px;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .table-header {
   display: flex;
   align-items: center;
@@ -632,6 +700,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .exchange-rate-settings {
+    flex-direction: column;
+  }
+
+  .exchange-rate-fields {
+    justify-content: flex-start;
+  }
+
   .analysis-summary-grid,
   .analysis-detail-grid {
     grid-template-columns: 1fr;
@@ -650,6 +726,13 @@
   }
 
   .table-search {
+    width: 100%;
+  }
+
+  .exchange-rate-fields,
+  .exchange-rate-fields label,
+  .exchange-rate-fields input,
+  .exchange-rate-fields button {
     width: 100%;
   }
 
