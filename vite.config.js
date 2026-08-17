@@ -5,6 +5,9 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
+    watch: {
+      ignored: ["**/backend-dna/**/bin/**", "**/backend-dna/**/obj/**"],
+    },
     proxy: {
       "/api": {
         target: "http://localhost:5257",
