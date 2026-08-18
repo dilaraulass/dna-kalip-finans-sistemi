@@ -173,7 +173,7 @@ const CONTRACT_EDITOR_CONFIG = {
     subjectText:
       "İşbu sözleşmenin konusu; MÜŞTERİ tarafından teknik şartname, data ve resimleri sağlanan aşağıda detayları belirtilen işin, DNA KALIP tarafından imal edilerek teslim edilmesini kapsar.",
     scopePlaceholder:
-      "Müşteri tarafındaki sorumluluk alanını veya detayları yazın...",
+      "Buraya müşteri tarafındaki sorumluluk alanınızı veya detayları kısaca yazabilirsiniz...",
   },
 };
 
@@ -181,16 +181,16 @@ const SUPPLIER_RESPONSIBILITIES = [
   ["respProcessDesign", "Proses Tasarımı", "Parça verilerine uygun üretim prosesinin planlanması."],
   ["respMoldDesign", "Kalıp Tasarımı", "DNA KALIP onayına sunulacak şekilde tasarımın yapılması."],
   ["respMaterialSupply", "Malzeme Temini", "Gerekli tüm çelik ve standart elemanların tedariki."],
-  ["respMachining", "2D & 3D İşlemeler", "CNC, tel erozyon ve diğer talaşlı imalat operasyonları."],
+  ["respMachining", "2D & 3D İşlemeler", "CNC, tel erozyon ve diğer tüm talaşlı imalat operasyonları."],
   ["respHeatTreatment", "Isıl İşlem", "Teknik şartnamelere uygun ısıl işlem ve sertifikalandırma."],
   ["respCoating", "Kaplama", "Gerektiğinde yüzey kaplama işlemlerinin yapılması."],
   ["respAssembly", "Montaj", "Tüm kalıp bileşenlerinin hassas montajının yapılması."],
   ["respPressTryout", "Pres Altı Alıştırmalar", "Kalıbın çalışır hale getirilmesi için mekanik alıştırmalar."],
   ["respLaserTryout", "Lazer Deneme", "Lazer kesim saclar ile ilk fonksiyonellik testleri."],
   ["respOffToolTryout", "OFF-TOOL Deneme", "Kalıptan çıkan ilk gerçek baskı denemeleri."],
-  ["respMeasurement", "Parça Ölçüselliği", "Numunelerin ölçüsel uygunluğu ve raporlanması."],
-  ["respShipment", "Sevk", "Onaylanan kalıpların veya parçaların DNA KALIP lokasyonuna sevki."],
-  ["respBuyoff", "Buy-Off ve Kalite Aksiyonları", "Buy-Off denetimleri ve kalite aksiyonlarının kapatılması."],
+  ["respMeasurement", "Parça Ölçüselliği", "Numunelerin %100 ölçüsel uygunluğu ve raporlanması."],
+  ["respShipment", "Kalıpların ve/veya Kalıp Parçalarının Sevki", "Onaylanan kalıpların veya parçaların DNA KALIP lokasyonuna nakliyesi."],
+  ["respBuyoff", "Buy-Off ve Kalite Aksiyonları", "Teslimat sürecindeki Buy-Off denetimleri ve kalite kontrol faaliyetleri neticesinde açılan tüm uygunsuzluk ve aksiyonların eksiksiz şekilde kapatılması."],
 ];
 
 const DNA_SUPPORT_ITEMS = [
@@ -1661,13 +1661,6 @@ function ContractPreview({ contract, onCancel }) {
 
   return (
     <div className="contract-preview">
-      {!contract.formDataJson && (
-        <div className="contracts-status warning">
-          Bu kayıt eski formatta oluşturulmuş. Şablon, ana sözleşme
-          bilgilerinden mümkün olduğunca dolduruldu.
-        </div>
-      )}
-
       <div className="contract-print-area">
         <CreateContractForm
           form={previewForm}
@@ -1923,7 +1916,7 @@ function DeliveryPlanSection({ form, onChange, title, rows, onNestedChange }) {
         ))}
       </div>
       <p>
-        * Gecikme durumunda sözleşmedeki cezai şartlar uygulanacaktır.
+        * Gecikme durumunda Madde 8'deki cezai şartlar uygulanacaktır.
       </p>
     </section>
   );
