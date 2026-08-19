@@ -27,3 +27,4 @@ dist-ssr
 bin/
 obj/
 *.user
+backend-dna/src/DnaKalip.Api/App_Data/DataProtectionKeys/

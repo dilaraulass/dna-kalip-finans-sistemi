@@ -13,6 +13,7 @@ public static class FinanceEndpoints
     public static IEndpointRouteBuilder MapFinanceEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/finance")
+            .RequireAuthorization(AuthPolicies.AuthenticatedUser)
             .WithTags("Finance");
 
         group.MapGet("/dashboard", async (
@@ -323,6 +324,7 @@ public static class FinanceEndpoints
 
             return Results.NoContent();
         })
+        .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
         .WithName("UpdatePaymentTracking");
 
@@ -364,6 +366,7 @@ public static class FinanceEndpoints
                 invoice.Id,
             });
         })
+        .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
         .WithName("CreateExpenseInvoice");
 
@@ -409,6 +412,7 @@ public static class FinanceEndpoints
 
             return Results.NoContent();
         })
+        .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
         .WithName("UpdateExpenseInvoice");
 
@@ -437,6 +441,7 @@ public static class FinanceEndpoints
 
             return Results.NoContent();
         })
+        .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
         .WithName("ArchiveExpenseInvoice");
 

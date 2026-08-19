@@ -12,6 +12,7 @@ public static class ContractsEndpoints
     public static IEndpointRouteBuilder MapContractsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/contracts")
+            .RequireAuthorization(AuthPolicies.AuthenticatedUser)
             .WithTags("Contracts");
 
         group.MapGet(string.Empty, async (

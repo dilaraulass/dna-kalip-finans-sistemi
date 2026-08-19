@@ -1,4 +1,5 @@
 using DnaKalip.Api.Entities;
+using DnaKalip.Api.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DnaKalip.Api.Data;
@@ -12,6 +13,9 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
     public DbSet<PaymentTracking> PaymentTrackings => Set<PaymentTracking>();
     public DbSet<ExpenseInvoice> ExpenseInvoices => Set<ExpenseInvoice>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<AppRole> AppRoles => Set<AppRole>();
+    public DbSet<AppUserRole> AppUserRoles => Set<AppUserRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +110,57 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
             entity.Property(rate => rate.RateToTry).HasPrecision(18, 6);
 
             entity.HasIndex(rate => new { rate.Currency, rate.EffectiveDate }).IsUnique();
+        });
+
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.Property(user => user.FullName).HasMaxLength(200).IsRequired();
+            entity.Property(user => user.Email).HasMaxLength(250).IsRequired();
+            entity.Property(user => user.NormalizedEmail).HasMaxLength(250).IsRequired();
+            entity.Property(user => user.PasswordHash).HasMaxLength(500).IsRequired();
+            entity.Property(user => user.IsActive).HasDefaultValue(true);
+
+            entity.HasIndex(user => user.NormalizedEmail).IsUnique();
+            entity.HasIndex(user => user.IsActive);
+        });
+
+        modelBuilder.Entity<AppRole>(entity =>
+        {
+            entity.Property(role => role.Name).HasMaxLength(50).IsRequired();
+            entity.Property(role => role.DisplayName).HasMaxLength(100).IsRequired();
+
+            entity.HasIndex(role => role.Name).IsUnique();
+
+            entity.HasData(
+                new AppRole
+                {
+                    Id = Guid.Parse("4f97df55-9d3d-46d5-a251-f65355369107"),
+                    Name = DnaKalip.Api.Domain.AppRoles.Admin,
+                    DisplayName = "Admin",
+                },
+                new AppRole
+                {
+                    Id = Guid.Parse("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                    Name = DnaKalip.Api.Domain.AppRoles.Accounting,
+                    DisplayName = "Muhasebe",
+                });
+        });
+
+        modelBuilder.Entity<AppUserRole>(entity =>
+        {
+            entity.HasKey(userRole => new { userRole.UserId, userRole.RoleId });
+
+            entity
+                .HasOne(userRole => userRole.User)
+                .WithMany(user => user.UserRoles)
+                .HasForeignKey(userRole => userRole.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity
+                .HasOne(userRole => userRole.Role)
+                .WithMany(role => role.UserRoles)
+                .HasForeignKey(userRole => userRole.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

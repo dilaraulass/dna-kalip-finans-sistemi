@@ -58,6 +58,7 @@
 }
 
 .sidebar .menu-item {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
@@ -88,10 +89,13 @@
 }
 
 .sidebar-footer {
-  margin-top: auto;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .user-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -102,13 +106,21 @@
 
 .avatar {
   width: 42px;
+  min-width: 42px;
   height: 42px;
+  min-height: 42px;
   border-radius: 50%;
   background: #2563eb;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  flex-shrink: 0;
+}
+
+.sidebar.closed .user-card {
+  justify-content: center;
+  padding: 12px;
 }
 
 .user-name {
@@ -143,6 +155,105 @@
 .topbar-title {
   font-size: 22px;
   font-weight: 700;
+}
+
+.app-loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  font-weight: 800;
+  background: #f4f6f8;
+}
+
+.app-loading img {
+  width: 88px;
+  height: auto;
+}
+
+.logout-btn {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sidebar.closed .logout-btn {
+  justify-content: center;
+}
+
+.sidebar.closed .menu-item::after,
+.sidebar.closed .user-card::after,
+.sidebar.closed .logout-btn::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 30;
+  transform: translateY(-50%);
+  min-width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.sidebar.closed .menu-item::before,
+.sidebar.closed .user-card::before,
+.sidebar.closed .logout-btn::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  z-index: 31;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #0f172a;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar.closed .menu-item:hover::after,
+.sidebar.closed .menu-item:focus-visible::after,
+.sidebar.closed .user-card:hover::after,
+.sidebar.closed .logout-btn:hover::after,
+.sidebar.closed .logout-btn:focus-visible::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(2px);
+}
+
+.sidebar.closed .menu-item:hover::before,
+.sidebar.closed .menu-item:focus-visible::before,
+.sidebar.closed .user-card:hover::before,
+.sidebar.closed .logout-btn:hover::before,
+.sidebar.closed .logout-btn:focus-visible::before {
+  opacity: 1;
 }
 
 @media (max-width: 720px) {

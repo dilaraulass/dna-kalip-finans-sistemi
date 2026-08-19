@@ -12,6 +12,7 @@ public static class CompaniesEndpoints
     public static IEndpointRouteBuilder MapCompaniesEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/companies")
+            .RequireAuthorization(AuthPolicies.AuthenticatedUser)
             .WithTags("Companies");
 
         group.MapGet(string.Empty, async (
