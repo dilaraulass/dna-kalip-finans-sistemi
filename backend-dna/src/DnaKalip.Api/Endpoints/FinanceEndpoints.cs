@@ -120,6 +120,10 @@ public static class FinanceEndpoints
                 .Select(invoice => new
                 {
                     invoice.Id,
+                    invoice.CompanyId,
+                    CompanyName = invoice.Company == null
+                        ? null
+                        : invoice.Company.Name,
                     invoice.WorkOrderNumber,
                     invoice.InvoiceType,
                     invoice.Description,
@@ -151,9 +155,10 @@ public static class FinanceEndpoints
 
                     return new FinanceExpenseInvoiceResponse(
                         invoice.Id,
+                        invoice.CompanyId,
                         NormalizeDisplayValue(invoice.WorkOrderNumber, "GENEL"),
                         NormalizeDisplayValue(invoice.InvoiceType),
-                        invoice.Description,
+                        NormalizeDisplayValue(invoice.CompanyName ?? invoice.Description),
                         invoice.Amount,
                         NormalizeCurrency(invoice.Currency),
                         invoice.InvoiceDate,
@@ -346,6 +351,7 @@ public static class FinanceEndpoints
             CancellationToken cancellationToken) =>
         {
             var validationErrors = ValidateExpenseInvoiceRequest(
+                request.CompanyId,
                 request.Description,
                 request.Amount,
                 request.Currency,
@@ -354,16 +360,28 @@ public static class FinanceEndpoints
                 request.InvoiceIssued,
                 request.InvoiceNumber);
 
+            await AddCompanyValidationErrorsAsync(
+                db,
+                validationErrors,
+                request.CompanyId,
+                cancellationToken);
+
             if (validationErrors.Count > 0)
             {
                 return Results.ValidationProblem(validationErrors);
             }
 
+            var companyName = await GetCompanyNameAsync(
+                db,
+                request.CompanyId!.Value,
+                cancellationToken);
+
             var invoice = new ExpenseInvoice
             {
+                CompanyId = request.CompanyId,
                 WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber),
                 InvoiceType = NormalizeOptional(request.InvoiceType),
-                Description = request.Description.Trim(),
+                Description = NormalizeOptional(request.Description) ?? companyName ?? string.Empty,
                 Amount = request.Amount,
                 Currency = NormalizeCurrency(request.Currency),
                 InvoiceDate = request.InvoiceDate,
@@ -395,6 +413,7 @@ public static class FinanceEndpoints
             CancellationToken cancellationToken) =>
         {
             var validationErrors = ValidateExpenseInvoiceRequest(
+                request.CompanyId,
                 request.Description,
                 request.Amount,
                 request.Currency,
@@ -402,6 +421,12 @@ public static class FinanceEndpoints
                 request.Status,
                 request.InvoiceIssued,
                 request.InvoiceNumber);
+
+            await AddCompanyValidationErrorsAsync(
+                db,
+                validationErrors,
+                request.CompanyId,
+                cancellationToken);
 
             if (validationErrors.Count > 0)
             {
@@ -418,9 +443,15 @@ public static class FinanceEndpoints
                 return Results.NotFound();
             }
 
+            var companyName = await GetCompanyNameAsync(
+                db,
+                request.CompanyId!.Value,
+                cancellationToken);
+
+            invoice.CompanyId = request.CompanyId;
             invoice.WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber);
             invoice.InvoiceType = NormalizeOptional(request.InvoiceType);
-            invoice.Description = request.Description.Trim();
+            invoice.Description = NormalizeOptional(request.Description) ?? companyName ?? string.Empty;
             invoice.Amount = request.Amount;
             invoice.Currency = NormalizeCurrency(request.Currency);
             invoice.InvoiceDate = request.InvoiceDate;
@@ -497,6 +528,7 @@ public static class FinanceEndpoints
     }
 
     private static Dictionary<string, string[]> ValidateExpenseInvoiceRequest(
+        Guid? companyId,
         string? description,
         decimal amount,
         string? currencyValue,
@@ -509,9 +541,9 @@ public static class FinanceEndpoints
         var currency = currencyValue?.Trim().ToUpperInvariant();
         var status = statusValue?.Trim().ToLowerInvariant();
 
-        if (string.IsNullOrWhiteSpace(description))
+        if (companyId is null)
         {
-            errors["description"] = ["Açıklama zorunludur."];
+            errors["companyId"] = ["Firma seçimi zorunludur."];
         }
 
         if (amount < 0)
@@ -537,6 +569,37 @@ public static class FinanceEndpoints
         AddInvoiceValidationErrors(errors, invoiceIssued, invoiceNumber);
 
         return errors;
+    }
+
+    private static async Task AddCompanyValidationErrorsAsync(
+        DnaKalipDbContext db,
+        Dictionary<string, string[]> errors,
+        Guid? companyId,
+        CancellationToken cancellationToken)
+    {
+        if (companyId is null || errors.ContainsKey("companyId"))
+        {
+            return;
+        }
+
+        var companyExists = await db.Companies
+            .AnyAsync(company => company.Id == companyId.Value, cancellationToken);
+
+        if (!companyExists)
+        {
+            errors["companyId"] = ["Seçilen firma bulunamadı."];
+        }
+    }
+
+    private static async Task<string?> GetCompanyNameAsync(
+        DnaKalipDbContext db,
+        Guid companyId,
+        CancellationToken cancellationToken)
+    {
+        return await db.Companies
+            .Where(company => company.Id == companyId)
+            .Select(company => company.Name)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static void AddInvoiceValidationErrors(

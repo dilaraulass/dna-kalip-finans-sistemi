@@ -11,6 +11,7 @@ import {
   updateExpenseInvoice,
   updatePaymentTracking,
 } from "../services/financeApi";
+import { getCompanies } from "../services/companiesApi";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
 import ExchangeRateSettings from "../components/Finance/ExchangeRateSettings";
@@ -99,6 +100,7 @@ function Finance() {
   const [reportWorkOrder, setReportWorkOrder] = useState(ALL_FILTER_VALUE);
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
+  const [companyOptions, setCompanyOptions] = useState([]);
 
   const loadFinanceDashboard = useCallback(async ({ signal } = {}) => {
     await Promise.resolve();
@@ -126,17 +128,29 @@ function Finance() {
     }
   }, []);
 
+  const loadCompanyOptions = useCallback(async ({ signal } = {}) => {
+    try {
+      const data = await getCompanies({ companyType: "all", signal });
+      setCompanyOptions(data || []);
+    } catch (requestError) {
+      if (requestError.name !== "AbortError") {
+        setCompanyOptions([]);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       loadFinanceDashboard({ signal: controller.signal });
+      loadCompanyOptions({ signal: controller.signal });
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [loadFinanceDashboard]);
+  }, [loadCompanyOptions, loadFinanceDashboard]);
 
   const supplierRows = useMemo(
     () =>
@@ -663,6 +677,7 @@ function Finance() {
             saving={detailUpdateSubmitting}
             archiving={detailArchiveSubmitting}
             mode={selectedRow?.isNew ? "create" : "edit"}
+            companyOptions={companyOptions}
             onSave={handleExpenseInvoiceSave}
             onArchive={handleExpenseInvoiceArchive}
           />

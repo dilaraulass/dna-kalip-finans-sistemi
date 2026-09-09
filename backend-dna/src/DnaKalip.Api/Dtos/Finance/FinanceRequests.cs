@@ -13,6 +13,7 @@ public sealed record UpsertExchangeRateRequest(
     DateOnly? EffectiveDate);
 
 public sealed record CreateExpenseInvoiceRequest(
+    Guid? CompanyId,
     string? WorkOrderNumber,
     string? InvoiceType,
     string Description,
@@ -26,6 +27,7 @@ public sealed record CreateExpenseInvoiceRequest(
     string? InvoiceNumber);
 
 public sealed record UpdateExpenseInvoiceRequest(
+    Guid? CompanyId,
     string? WorkOrderNumber,
     string? InvoiceType,
     string Description,

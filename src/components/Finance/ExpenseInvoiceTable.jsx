@@ -40,7 +40,7 @@ function ExpenseInvoiceTable({
   const columns = [
     { field: "workOrder", headerName: "İş Emri", width: 110 },
     { field: "invoiceType", headerName: "Gider Türü", width: 160 },
-    { field: "company", headerName: "Firma / Açıklama", width: 220 },
+    { field: "company", headerName: "Firma", width: 220 },
     {
       field: "convertedAmount",
       headerName: "Tutar",

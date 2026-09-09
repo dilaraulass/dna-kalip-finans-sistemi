@@ -106,6 +106,13 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
             entity.HasIndex(invoice => invoice.WorkOrderNumber);
             entity.HasIndex(invoice => invoice.InvoiceDate);
             entity.HasIndex(invoice => invoice.IsArchived);
+            entity.HasIndex(invoice => invoice.CompanyId);
+
+            entity
+                .HasOne(invoice => invoice.Company)
+                .WithMany(company => company.ExpenseInvoices)
+                .HasForeignKey(invoice => invoice.CompanyId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ExchangeRate>(entity =>

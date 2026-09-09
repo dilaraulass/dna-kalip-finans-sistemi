@@ -44,6 +44,7 @@ public sealed record FinancePaymentMilestoneResponse(
 
 public sealed record FinanceExpenseInvoiceResponse(
     Guid Id,
+    Guid? CompanyId,
     string WorkOrder,
     string InvoiceType,
     string Company,

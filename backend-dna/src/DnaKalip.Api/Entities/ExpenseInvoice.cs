@@ -3,6 +3,7 @@ namespace DnaKalip.Api.Entities;
 public class ExpenseInvoice
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? CompanyId { get; set; }
     public string? WorkOrderNumber { get; set; }
     public string? InvoiceType { get; set; }
     public string Description { get; set; } = string.Empty;
@@ -17,4 +18,6 @@ public class ExpenseInvoice
     public bool IsArchived { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public Company? Company { get; set; }
 }

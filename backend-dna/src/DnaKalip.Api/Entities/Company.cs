@@ -11,4 +11,5 @@ public class Company
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Contract> Contracts { get; set; } = [];
+    public ICollection<ExpenseInvoice> ExpenseInvoices { get; set; } = [];
 }

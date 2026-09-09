@@ -10,6 +10,7 @@ import "../FinanceDetail/FinanceDetail.css";
 
 function getInitialForm(selectedRow) {
   return {
+    companyId: selectedRow?.companyId || "",
     workOrderNumber:
       selectedRow?.workOrder === "GENEL" ? "" : selectedRow?.workOrder || "",
     invoiceType: selectedRow?.invoiceType || "",
@@ -32,6 +33,7 @@ function ExpenseDetail({
   saving = false,
   archiving = false,
   mode = "edit",
+  companyOptions = [],
   onSave,
   onArchive,
 }) {
@@ -39,6 +41,10 @@ function ExpenseDetail({
   const isCreateMode = mode === "create";
 
   if (!selectedRow) return null;
+
+  const selectedCompany = companyOptions.find(
+    (company) => company.id === form.companyId,
+  );
 
   function handleChange(event) {
     const { checked, name, type, value } = event.target;
@@ -54,9 +60,10 @@ function ExpenseDetail({
     event.preventDefault();
 
     onSave?.({
+      companyId: form.companyId,
       workOrderNumber: form.workOrderNumber || null,
       invoiceType: form.invoiceType || null,
-      description: form.description,
+      description: selectedCompany?.name || form.description,
       amount: Number.parseFloat(form.amount || "0"),
       currency: form.currency,
       invoiceDate: form.invoiceDate,
@@ -86,7 +93,7 @@ function ExpenseDetail({
 
             <div className="finance-detail-grid">
               <div>
-                <span>Firma / Açıklama</span>
+                <span>Firma</span>
                 <strong>{selectedRow.company}</strong>
               </div>
 
@@ -170,14 +177,24 @@ function ExpenseDetail({
 
         <div className="finance-detail-form-grid">
           <label>
-            <span>Firma / Açıklama</span>
-            <textarea
-              name="description"
-              value={form.description}
+            <span>Firma</span>
+            <select
+              name="companyId"
+              value={form.companyId}
               onChange={handleChange}
-              rows={3}
               required
-            />
+            >
+              <option value="">
+                {form.description
+                  ? `Firma seçin (${form.description})`
+                  : "Firma seçin"}
+              </option>
+              {companyOptions.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label>
