@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildFinancialAnalysis,
   convertAmount,
+  formatMoney,
 } from "../services/financeService";
 import {
   archiveExpenseInvoice,
@@ -12,6 +13,7 @@ import {
   updatePaymentTracking,
 } from "../services/financeApi";
 import { getCompanies } from "../services/companiesApi";
+import { exportRowsToExcel } from "../services/excelExport";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
 import ExchangeRateSettings from "../components/Finance/ExchangeRateSettings";
@@ -68,6 +70,75 @@ function buildExchangeRateForm(exchangeRates) {
 
 function parseRateInput(value) {
   return Number.parseFloat(String(value).replace(",", "."));
+}
+
+function getPaymentExportColumns({ companyLabel, displayCurrency }) {
+  return [
+    { label: "Sözleşme No", width: 130, value: (row) => row.contractNumber },
+    { label: companyLabel, width: 180, value: (row) => row.company },
+    { label: "İş Emri No", width: 110, value: (row) => row.workOrder },
+    { label: "Parça Ref. No", width: 160, value: (row) => row.referenceNumber },
+    {
+      label: "Sözleşme Bedeli",
+      width: 140,
+      value: (row) => formatMoney(row.convertedContractAmount, displayCurrency),
+    },
+    {
+      label: "Hakediş Şartı",
+      width: 260,
+      value: (row) =>
+        row.subMilestone
+          ? `${row.milestoneCondition} (${row.subMilestone})`
+          : row.milestoneCondition,
+    },
+    { label: "Vade", width: 70, value: (row) => row.activeDueDays },
+    { label: "Onay Tarihi", width: 110, value: (row) => row.approvalDate || "" },
+    {
+      label: "Ödeme / Tahsilat Tarihi",
+      width: 150,
+      value: (row) => row.paymentDate || "",
+    },
+    {
+      label: "Fatura Kesildi",
+      width: 120,
+      value: (row) => (row.invoiceIssued ? "Evet" : "Hayır"),
+    },
+    { label: "Fatura No", width: 130, value: (row) => row.invoiceNumber || "" },
+    {
+      label: "Tutar",
+      width: 130,
+      value: (row) => formatMoney(row.convertedAmount, displayCurrency),
+    },
+    { label: "Durum", width: 120, value: (row) => row.status },
+  ];
+}
+
+function getExpenseExportColumns({ displayCurrency }) {
+  return [
+    { label: "İş Emri", width: 110, value: (row) => row.workOrder },
+    { label: "Gider Türü", width: 150, value: (row) => row.invoiceType },
+    { label: "Firma", width: 190, value: (row) => row.company },
+    {
+      label: "Tutar",
+      width: 130,
+      value: (row) => formatMoney(row.convertedAmount, displayCurrency),
+    },
+    { label: "Fatura Tarihi", width: 120, value: (row) => row.invoiceDate || "" },
+    {
+      label: "Fatura Kesildi",
+      width: 120,
+      value: (row) => (row.invoiceIssued ? "Evet" : "Hayır"),
+    },
+    { label: "Fatura No", width: 130, value: (row) => row.invoiceNumber || "" },
+    { label: "Vade", width: 70, value: (row) => row.dueDays },
+    { label: "Ödeme Tarihi", width: 120, value: (row) => row.paymentDate || "" },
+    {
+      label: "Hesaplanan Vade Tarihi",
+      width: 150,
+      value: (row) => row.expectedPaymentDate || "",
+    },
+    { label: "Durum", width: 120, value: (row) => row.status },
+  ];
 }
 
 function Finance() {
@@ -486,6 +557,35 @@ function Finance() {
     }
   }
 
+  function handlePaymentExcelExport() {
+    const moduleTitle =
+      activeTab === FINANCE_MODULES.customer
+        ? "Müşteri Tahsilatları"
+        : "Tedarikçi Ödemeleri";
+    const filenamePrefix =
+      activeTab === FINANCE_MODULES.customer
+        ? "musteri-tahsilatlari"
+        : "tedarikci-odemeleri";
+
+    exportRowsToExcel({
+      filenamePrefix,
+      title: moduleTitle,
+      description: `${filteredRows.length} kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
+      columns: getPaymentExportColumns({ companyLabel, displayCurrency }),
+      rows: filteredRows,
+    });
+  }
+
+  function handleExpenseExcelExport() {
+    exportRowsToExcel({
+      filenamePrefix: "ek-gider-faturalari",
+      title: "Ek Gider Faturaları",
+      description: `${filteredExpenseRows.length} kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
+      columns: getExpenseExportColumns({ displayCurrency }),
+      rows: filteredExpenseRows,
+    });
+  }
+
   function handleExchangeRateChange(event) {
     const { name, value } = event.target;
 
@@ -602,6 +702,7 @@ function Finance() {
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
+              onExportExcel={handlePaymentExcelExport}
             />
           )}
           {activeTab === FINANCE_MODULES.expenses && (
@@ -631,6 +732,7 @@ function Finance() {
               }}
               setSelectedRowId={setSelectedRowId}
               onCreateInvoice={handleCreateExpenseInvoice}
+              onExportExcel={handleExpenseExcelExport}
             />
           )}
           {activeTab === FINANCE_MODULES.analysis && (

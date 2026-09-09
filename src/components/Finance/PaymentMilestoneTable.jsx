@@ -27,6 +27,7 @@ function PaymentMilestoneTable({
   selectedRowId,
   setSelectedRow,
   setSelectedRowId,
+  onExportExcel,
 }) {
   const columns = [
     { field: "contractNumber", headerName: "Sözleşme No", width: 160 },
@@ -96,13 +97,23 @@ function PaymentMilestoneTable({
           <p>{rows.length} hakediş kaydı gösteriliyor</p>
         </div>
 
-        <input
-          className="table-search"
-          type="text"
-          placeholder="Sözleşme, tedarikçi, iş emri ara..."
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-        />
+        <div className="table-header-actions">
+          <input
+            className="table-search"
+            type="text"
+            placeholder="Sözleşme, tedarikçi, iş emri ara..."
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+          />
+          <button
+            type="button"
+            className="finance-primary-btn"
+            onClick={onExportExcel}
+            disabled={rows.length === 0}
+          >
+            Excel&apos;e Aktar
+          </button>
+        </div>
       </div>
 
       <div className="finance-filters">

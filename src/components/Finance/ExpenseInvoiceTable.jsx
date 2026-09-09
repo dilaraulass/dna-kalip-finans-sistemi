@@ -36,6 +36,7 @@ function ExpenseInvoiceTable({
   setSelectedRow,
   setSelectedRowId,
   onCreateInvoice,
+  onExportExcel,
 }) {
   const columns = [
     { field: "workOrder", headerName: "İş Emri", width: 110 },
@@ -89,6 +90,14 @@ function ExpenseInvoiceTable({
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
+          <button
+            type="button"
+            className="finance-primary-btn"
+            onClick={onExportExcel}
+            disabled={rows.length === 0}
+          >
+            Excel&apos;e Aktar
+          </button>
           <button
             type="button"
             className="finance-primary-btn"
