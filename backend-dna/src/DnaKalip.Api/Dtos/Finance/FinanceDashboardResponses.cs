@@ -35,6 +35,8 @@ public sealed record FinancePaymentMilestoneResponse(
     DateOnly? ApprovalDate,
     DateOnly? PaymentDate,
     string PaymentStatus,
+    bool InvoiceIssued,
+    string InvoiceNumber,
     string StatusKey,
     string Status,
     int? DaysUntilDue,
@@ -53,6 +55,8 @@ public sealed record FinanceExpenseInvoiceResponse(
     DateOnly ExpectedPaymentDate,
     int? PaymentDateDifference,
     string PaymentStatus,
+    bool InvoiceIssued,
+    string InvoiceNumber,
     string StatusKey,
     string Status,
     int? DaysUntilDue);

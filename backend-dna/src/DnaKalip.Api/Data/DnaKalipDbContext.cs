@@ -80,6 +80,8 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
         modelBuilder.Entity<PaymentTracking>(entity =>
         {
             entity.Property(payment => payment.Status).HasMaxLength(25).IsRequired();
+            entity.Property(payment => payment.InvoiceIssued).HasDefaultValue(false);
+            entity.Property(payment => payment.InvoiceNumber).HasMaxLength(100);
             entity.HasIndex(payment => payment.ContractMilestoneId).IsUnique();
 
             entity
@@ -97,6 +99,8 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
             entity.Property(invoice => invoice.Amount).HasPrecision(18, 2);
             entity.Property(invoice => invoice.Currency).HasMaxLength(3).IsRequired();
             entity.Property(invoice => invoice.Status).HasMaxLength(25).IsRequired();
+            entity.Property(invoice => invoice.InvoiceIssued).HasDefaultValue(false);
+            entity.Property(invoice => invoice.InvoiceNumber).HasMaxLength(100);
             entity.Property(invoice => invoice.IsArchived).HasDefaultValue(false);
 
             entity.HasIndex(invoice => invoice.WorkOrderNumber);

@@ -8,6 +8,8 @@ public class PaymentTracking
     public DateOnly? PaymentDate { get; set; }
     public string Status { get; set; } = "pending";
     public int? DueDaysOverride { get; set; }
+    public bool InvoiceIssued { get; set; }
+    public string? InvoiceNumber { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ContractMilestone ContractMilestone { get; set; } = null!;

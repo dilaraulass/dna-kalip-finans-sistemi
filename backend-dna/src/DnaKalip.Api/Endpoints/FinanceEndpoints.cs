@@ -59,6 +59,8 @@ public static class FinanceEndpoints
                             milestone.PaymentTracking.PaymentDate,
                             milestone.PaymentTracking.Status,
                             milestone.PaymentTracking.DueDaysOverride,
+                            milestone.PaymentTracking.InvoiceIssued,
+                            milestone.PaymentTracking.InvoiceNumber,
                         },
                 })
                 .ToListAsync(cancellationToken);
@@ -101,6 +103,8 @@ public static class FinanceEndpoints
                         milestone.PaymentTracking?.ApprovalDate,
                         milestone.PaymentTracking?.PaymentDate,
                         paymentStatus,
+                        milestone.PaymentTracking?.InvoiceIssued ?? false,
+                        milestone.PaymentTracking?.InvoiceNumber ?? string.Empty,
                         status.StatusKey,
                         status.Status,
                         status.DaysUntilDue,
@@ -125,6 +129,8 @@ public static class FinanceEndpoints
                     invoice.DueDays,
                     invoice.PaymentDate,
                     invoice.Status,
+                    invoice.InvoiceIssued,
+                    invoice.InvoiceNumber,
                 })
                 .ToListAsync(cancellationToken);
 
@@ -156,6 +162,8 @@ public static class FinanceEndpoints
                         expectedPaymentDate,
                         paymentDateDifference,
                         paymentStatus,
+                        invoice.InvoiceIssued,
+                        invoice.InvoiceNumber ?? string.Empty,
                         status.StatusKey,
                         status.Status,
                         status.DaysUntilDue);
@@ -319,6 +327,10 @@ public static class FinanceEndpoints
             paymentTracking.PaymentDate = request.PaymentDate;
             paymentTracking.Status = request.Status.Trim().ToLowerInvariant();
             paymentTracking.DueDaysOverride = request.DueDaysOverride;
+            paymentTracking.InvoiceIssued = request.InvoiceIssued;
+            paymentTracking.InvoiceNumber = request.InvoiceIssued
+                ? NormalizeOptional(request.InvoiceNumber)
+                : null;
 
             await db.SaveChangesAsync(cancellationToken);
 
@@ -338,7 +350,9 @@ public static class FinanceEndpoints
                 request.Amount,
                 request.Currency,
                 request.DueDays,
-                request.Status);
+                request.Status,
+                request.InvoiceIssued,
+                request.InvoiceNumber);
 
             if (validationErrors.Count > 0)
             {
@@ -356,6 +370,10 @@ public static class FinanceEndpoints
                 DueDays = request.DueDays,
                 PaymentDate = request.PaymentDate,
                 Status = request.Status.Trim().ToLowerInvariant(),
+                InvoiceIssued = request.InvoiceIssued,
+                InvoiceNumber = request.InvoiceIssued
+                    ? NormalizeOptional(request.InvoiceNumber)
+                    : null,
             };
 
             db.ExpenseInvoices.Add(invoice);
@@ -381,7 +399,9 @@ public static class FinanceEndpoints
                 request.Amount,
                 request.Currency,
                 request.DueDays,
-                request.Status);
+                request.Status,
+                request.InvoiceIssued,
+                request.InvoiceNumber);
 
             if (validationErrors.Count > 0)
             {
@@ -407,6 +427,10 @@ public static class FinanceEndpoints
             invoice.DueDays = request.DueDays;
             invoice.PaymentDate = request.PaymentDate;
             invoice.Status = request.Status.Trim().ToLowerInvariant();
+            invoice.InvoiceIssued = request.InvoiceIssued;
+            invoice.InvoiceNumber = request.InvoiceIssued
+                ? NormalizeOptional(request.InvoiceNumber)
+                : null;
 
             await db.SaveChangesAsync(cancellationToken);
 
@@ -464,6 +488,11 @@ public static class FinanceEndpoints
             errors["dueDaysOverride"] = ["Vade negatif olamaz."];
         }
 
+        AddInvoiceValidationErrors(
+            errors,
+            request.InvoiceIssued,
+            request.InvoiceNumber);
+
         return errors;
     }
 
@@ -472,7 +501,9 @@ public static class FinanceEndpoints
         decimal amount,
         string? currencyValue,
         int dueDays,
-        string? statusValue)
+        string? statusValue,
+        bool invoiceIssued,
+        string? invoiceNumber)
     {
         var errors = new Dictionary<string, string[]>();
         var currency = currencyValue?.Trim().ToUpperInvariant();
@@ -503,7 +534,26 @@ public static class FinanceEndpoints
             errors["status"] = ["Durum paid veya pending olmalıdır."];
         }
 
+        AddInvoiceValidationErrors(errors, invoiceIssued, invoiceNumber);
+
         return errors;
+    }
+
+    private static void AddInvoiceValidationErrors(
+        Dictionary<string, string[]> errors,
+        bool invoiceIssued,
+        string? invoiceNumber)
+    {
+        if (invoiceIssued && string.IsNullOrWhiteSpace(invoiceNumber))
+        {
+            errors["invoiceNumber"] = ["Fatura kesildiyse fatura no zorunludur."];
+            return;
+        }
+
+        if (invoiceNumber?.Trim().Length > 100)
+        {
+            errors["invoiceNumber"] = ["Fatura no en fazla 100 karakter olabilir."];
+        }
     }
 
     private static Dictionary<string, string[]> ValidateExchangeRateRequest(

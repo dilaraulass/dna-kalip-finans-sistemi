@@ -76,6 +76,23 @@
   padding: 0 10px;
 }
 
+.finance-detail-form-grid input:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.finance-detail-checkbox-label {
+  justify-content: center;
+}
+
+.finance-detail-checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: #2563eb;
+}
+
 .finance-detail-form-grid textarea {
   min-height: 86px;
   padding: 10px;

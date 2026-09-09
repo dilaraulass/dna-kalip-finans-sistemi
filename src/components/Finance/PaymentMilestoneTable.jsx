@@ -56,6 +56,15 @@ function PaymentMilestoneTable({
     { field: "approvalDate", headerName: "Onay Trh.", width: 115 },
     { field: "paymentDate", headerName: "Ödeme Trh.", width: 115 },
     {
+      field: "invoiceIssued",
+      headerName: "Fatura Kesildi",
+      width: 135,
+      renderCell: ({ row }) => (
+        <input type="checkbox" checked={row.invoiceIssued} readOnly />
+      ),
+    },
+    { field: "invoiceNumber", headerName: "Fatura No", width: 140 },
+    {
       field: "convertedAmount",
       headerName: "Tutar",
       width: 130,

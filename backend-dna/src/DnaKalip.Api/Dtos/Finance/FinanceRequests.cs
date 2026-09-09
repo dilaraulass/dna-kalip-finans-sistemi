@@ -4,7 +4,9 @@ public sealed record UpdatePaymentTrackingRequest(
     DateOnly? ApprovalDate,
     DateOnly? PaymentDate,
     string Status,
-    int? DueDaysOverride);
+    int? DueDaysOverride,
+    bool InvoiceIssued,
+    string? InvoiceNumber);
 
 public sealed record UpsertExchangeRateRequest(
     decimal RateToTry,
@@ -19,7 +21,9 @@ public sealed record CreateExpenseInvoiceRequest(
     DateOnly InvoiceDate,
     int DueDays,
     DateOnly? PaymentDate,
-    string Status);
+    string Status,
+    bool InvoiceIssued,
+    string? InvoiceNumber);
 
 public sealed record UpdateExpenseInvoiceRequest(
     string? WorkOrderNumber,
@@ -30,4 +34,6 @@ public sealed record UpdateExpenseInvoiceRequest(
     DateOnly InvoiceDate,
     int DueDays,
     DateOnly? PaymentDate,
-    string Status);
+    string Status,
+    bool InvoiceIssued,
+    string? InvoiceNumber);

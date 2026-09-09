@@ -12,6 +12,8 @@ function getInitialForm(selectedRow) {
     paymentDate: selectedRow?.paymentDate || "",
     status: selectedRow?.paymentStatus || PAYMENT_STATUSES.pending,
     dueDays: String(selectedRow?.activeDueDays ?? ""),
+    invoiceIssued: Boolean(selectedRow?.invoiceIssued),
+    invoiceNumber: selectedRow?.invoiceNumber || "",
   };
 }
 
@@ -27,11 +29,12 @@ function FinanceDetail({
   if (!selectedRow) return null;
 
   function handleChange(event) {
-    const { name, value } = event.target;
+    const { checked, name, type, value } = event.target;
 
     setForm((currentForm) => ({
       ...currentForm,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
+      ...(name === "invoiceIssued" && !checked ? { invoiceNumber: "" } : {}),
     }));
   }
 
@@ -50,6 +53,8 @@ function FinanceDetail({
       paymentDate: form.paymentDate || null,
       status: form.status,
       dueDaysOverride,
+      invoiceIssued: form.invoiceIssued,
+      invoiceNumber: form.invoiceIssued ? form.invoiceNumber.trim() : null,
     });
   }
 
@@ -132,6 +137,16 @@ function FinanceDetail({
             <span>Vade</span>
             <strong>{selectedRow.activeDueDays} gün</strong>
           </div>
+
+          <div>
+            <span>Fatura Kesildi</span>
+            <strong>{selectedRow.invoiceIssued ? "Evet" : "Hayır"}</strong>
+          </div>
+
+          <div>
+            <span>Fatura No</span>
+            <strong>{selectedRow.invoiceNumber || "-"}</strong>
+          </div>
         </div>
       </div>
 
@@ -180,6 +195,28 @@ function FinanceDetail({
               min="0"
               value={form.dueDays}
               onChange={handleChange}
+            />
+          </label>
+
+          <label className="finance-detail-checkbox-label">
+            <input
+              type="checkbox"
+              name="invoiceIssued"
+              checked={form.invoiceIssued}
+              onChange={handleChange}
+            />
+            <span>Fatura Kesildi</span>
+          </label>
+
+          <label>
+            <span>Fatura No</span>
+            <input
+              type="text"
+              name="invoiceNumber"
+              value={form.invoiceNumber}
+              onChange={handleChange}
+              disabled={!form.invoiceIssued}
+              required={form.invoiceIssued}
             />
           </label>
         </div>

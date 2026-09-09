@@ -48,6 +48,15 @@ function ExpenseInvoiceTable({
       valueFormatter: (value) => formatMoney(value, displayCurrency),
     },
     { field: "invoiceDate", headerName: "Fatura Tarihi", width: 125 },
+    {
+      field: "invoiceIssued",
+      headerName: "Fatura Kesildi",
+      width: 135,
+      renderCell: ({ row }) => (
+        <input type="checkbox" checked={row.invoiceIssued} readOnly />
+      ),
+    },
+    { field: "invoiceNumber", headerName: "Fatura No", width: 140 },
     { field: "dueDays", headerName: "Vade", width: 80 },
     { field: "paymentDate", headerName: "Ödeme Tarihi", width: 125 },
     {

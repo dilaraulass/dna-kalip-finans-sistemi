@@ -46,6 +46,8 @@ const NEW_EXPENSE_INVOICE_ROW = {
   expectedPaymentDate: "",
   paymentDateDifference: null,
   paymentStatus: "pending",
+  invoiceIssued: false,
+  invoiceNumber: "",
   statusKey: "pending",
   status: "Bekleyen",
   daysUntilDue: null,
