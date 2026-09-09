@@ -1,14 +1,20 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { useAuth } from "../auth/useAuth";
 import "./Login.css";
 
 function Login() {
   const { signIn } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const redirectTo =
+    `${location.state?.from?.pathname || "/finance"}${location.state?.from?.search || ""}`;
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -21,6 +27,7 @@ function Login() {
         email: email.trim(),
         password,
       });
+      navigate(redirectTo, { replace: true });
     } catch (requestError) {
       setError(
         requestError.status === 401

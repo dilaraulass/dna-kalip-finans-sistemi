@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, NavLink } from "react-router-dom";
+import { Routes, Route, Navigate, NavLink, useLocation } from "react-router-dom";
 import Finance from "./pages/Finance";
 import Contracts from "./pages/Contracts";
 import Companies from "./pages/Companies";
@@ -17,6 +17,7 @@ import "./App.css";
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, loading, isAdmin, signOut } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -28,7 +29,15 @@ function App() {
   }
 
   if (!user) {
-    return <Login />;
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="*"
+          element={<Navigate to="/login" replace state={{ from: location }} />}
+        />
+      </Routes>
+    );
   }
 
   return (
@@ -112,6 +121,7 @@ function App() {
           <Route path="/companies" element={<Companies />} />
           <Route path="/payments" element={<PaymentTracking />} />
           {isAdmin && <Route path="/users" element={<Users />} />}
+          <Route path="/login" element={<Navigate to="/finance" replace />} />
           <Route path="*" element={<Navigate to="/finance" replace />} />
         </Routes>
       </main>
