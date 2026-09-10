@@ -60,6 +60,7 @@ const INITIAL_CONTRACT_FORM = {
   companyName: "",
   contractDate: "",
   projectNumber: "",
+  customerName: "",
   customerProject: "",
   workOrderNumber: "",
   referenceNumber: "",
@@ -1463,8 +1464,16 @@ function CreateContractForm({
                 <div className="contract-document-info-grid">
                   <EditableField
                     label={form.financeTab === "tedarikci" ? "Müşteri" : "Proje"}
-                    name="projectNumber"
-                    value={form.projectNumber}
+                    name={
+                      form.financeTab === "tedarikci"
+                        ? "customerName"
+                        : "projectNumber"
+                    }
+                    value={
+                      form.financeTab === "tedarikci"
+                        ? form.customerName
+                        : form.projectNumber
+                    }
                     onChange={onChange}
                   />
                   <EditableField
