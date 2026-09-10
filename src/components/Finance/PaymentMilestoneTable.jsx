@@ -1,6 +1,4 @@
-import { DataGrid } from "@mui/x-data-grid";
-import { trTR } from "@mui/x-data-grid/locales";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ALL_FILTER_VALUE,
   CURRENCY_OPTIONS,
@@ -86,120 +84,96 @@ function PaymentMilestoneTable({
     event.stopPropagation();
   }
 
-  const columns = [
-    { field: "contractNumber", headerName: "Sözleşme No", width: 160 },
-    {
-      field: "company",
-      headerName: activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi",
-      width: 175,
-    },
-    { field: "workOrder", headerName: "İş Emri No", width: 115 },
-    { field: "referenceNumber", headerName: "Parça Ref. No", width: 180 },
-    {
-      field: "convertedContractAmount",
-      headerName: "Sözleşme Bedeli",
-      width: 150,
-      valueFormatter: (value) => formatMoney(value, displayCurrency),
-    },
-    {
-      field: "milestoneCondition",
-      headerName: "Hakediş Şartı",
-      width: 260,
-      valueGetter: (_value, row) =>
-        row.subMilestone
-          ? `${row.milestoneCondition} (${row.subMilestone})`
-          : row.milestoneCondition,
-    },
-    { field: "activeDueDays", headerName: "Vade", width: 80 },
-    { field: "approvalDate", headerName: "Onay Trh.", width: 115 },
-    { field: "paymentDate", headerName: "Ödeme Trh.", width: 115 },
-    {
-      field: "invoiceIssued",
-      headerName: "Fatura Kesildi",
-      width: 135,
-      sortable: false,
-      renderCell: ({ row }) => {
-        const draft = getInvoiceDraft(row);
-        const isSaving = Boolean(savingInvoiceIds[row.id]);
+  const groupedRows = useMemo(() => {
+    const groups = [];
+    const groupMap = new Map();
 
-        return (
-          <input
-            type="checkbox"
-            className="finance-inline-checkbox"
-            checked={draft.invoiceIssued}
-            disabled={isSaving}
-            onClick={stopGridEvent}
-            onChange={(event) => {
-              const nextDraft = {
-                invoiceIssued: event.target.checked,
-                invoiceNumber: event.target.checked ? draft.invoiceNumber : "",
-              };
+    rows.forEach((row) => {
+      const groupKey = row.contractId || row.contractNumber;
+      let group = groupMap.get(groupKey);
 
-              setInvoiceDraft(row, nextDraft);
+      if (!group) {
+        group = {
+          id: groupKey,
+          contractNumber: row.contractNumber,
+          company: row.company,
+          workOrder: row.workOrder,
+          referenceNumber: row.referenceNumber,
+          contractAmount: row.convertedContractAmount,
+          items: [],
+        };
+        groupMap.set(groupKey, group);
+        groups.push(group);
+      }
 
-              if (!nextDraft.invoiceIssued || nextDraft.invoiceNumber.trim()) {
-                commitInvoiceDraft(row, nextDraft);
-              }
-            }}
-          />
-        );
-      },
-    },
-    {
-      field: "invoiceNumber",
-      headerName: "Fatura No",
-      width: 150,
-      sortable: false,
-      renderCell: ({ row }) => {
-        const draft = getInvoiceDraft(row);
-        const isSaving = Boolean(savingInvoiceIds[row.id]);
+      group.items.push(row);
+    });
 
-        return (
-          <input
-            type="text"
-            className="finance-inline-input"
-            value={draft.invoiceNumber}
-            disabled={!draft.invoiceIssued || isSaving}
-            placeholder={draft.invoiceIssued ? "Fatura no" : "-"}
-            onClick={stopGridEvent}
-            onDoubleClick={stopGridEvent}
-            onChange={(event) =>
-              setInvoiceDraft(row, {
-                ...draft,
-                invoiceNumber: event.target.value,
-              })
-            }
-            onBlur={() => commitInvoiceDraft(row, draft)}
-            onKeyDown={(event) => {
-              event.stopPropagation();
+    return groups;
+  }, [rows]);
 
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-          />
-        );
-      },
-    },
-    {
-      field: "convertedAmount",
-      headerName: "Tutar",
-      width: 130,
-      valueFormatter: (value) => formatMoney(value, displayCurrency),
-    },
-    {
-      field: "status",
-      headerName: "Durum",
-      width: 145,
-      renderCell: ({ row }) => (
-        <StatusBadge
-          statusKey={row.statusKey}
-          status={row.status}
-          daysUntilDue={row.daysUntilDue}
-        />
-      ),
-    },
-  ];
+  function renderInvoiceIssuedCell(row) {
+    const draft = getInvoiceDraft(row);
+    const isSaving = Boolean(savingInvoiceIds[row.id]);
+
+    return (
+      <input
+        type="checkbox"
+        className="finance-inline-checkbox"
+        checked={draft.invoiceIssued}
+        disabled={isSaving}
+        onClick={stopGridEvent}
+        onChange={(event) => {
+          const nextDraft = {
+            invoiceIssued: event.target.checked,
+            invoiceNumber: event.target.checked ? draft.invoiceNumber : "",
+          };
+
+          setInvoiceDraft(row, nextDraft);
+
+          if (!nextDraft.invoiceIssued || nextDraft.invoiceNumber.trim()) {
+            commitInvoiceDraft(row, nextDraft);
+          }
+        }}
+      />
+    );
+  }
+
+  function renderInvoiceNumberCell(row) {
+    const draft = getInvoiceDraft(row);
+    const isSaving = Boolean(savingInvoiceIds[row.id]);
+
+    return (
+      <input
+        type="text"
+        className="finance-inline-input"
+        value={draft.invoiceNumber}
+        disabled={!draft.invoiceIssued || isSaving}
+        placeholder={draft.invoiceIssued ? "Fatura no" : "-"}
+        onClick={stopGridEvent}
+        onDoubleClick={stopGridEvent}
+        onChange={(event) =>
+          setInvoiceDraft(row, {
+            ...draft,
+            invoiceNumber: event.target.value,
+          })
+        }
+        onBlur={() => commitInvoiceDraft(row, draft)}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    );
+  }
+
+  function handleRowClick(row) {
+    setSelectedRow(row);
+    setSelectedRowId(row.id);
+  }
 
   return (
     <>
@@ -294,33 +268,96 @@ function PaymentMilestoneTable({
         </button>
       </div>
 
-      <div style={{ height: 560, width: "100%" }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          pageSizeOptions={[10, 25, 50]}
-          initialState={{
-            pagination: {
-              paginationModel: { pageSize: 10, page: 0 },
-            },
-            sorting: {
-              sortModel: [{ field: "paymentDate", sort: "asc" }],
-            },
-          }}
-          localeText={trTR.components.MuiDataGrid.defaultProps.localeText}
-          disableRowSelectionOnClick
-          onRowClick={(params) => {
-            setSelectedRow(params.row);
-            setSelectedRowId(params.id);
-          }}
-          getRowClassName={(params) => {
-            const classes = [`finance-row-${params.row.statusKey}`];
-            if (params.id === selectedRowId) {
-              classes.push("selected-grid-row");
-            }
-            return classes.join(" ");
-          }}
-        />
+      <div className="finance-grouped-table-wrap">
+        <table className="finance-grouped-table">
+          <thead>
+            <tr>
+              <th>Sözleşme No</th>
+              <th>{activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi"}</th>
+              <th>İş Emri No</th>
+              <th>Parça Ref. No</th>
+              <th>Sözleşme Bedeli</th>
+              <th>Hakediş Şartı</th>
+              <th>Vade</th>
+              <th>Onay Trh.</th>
+              <th>Ödeme Trh.</th>
+              <th>Fatura Kesildi</th>
+              <th>Fatura No</th>
+              <th>Tutar</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupedRows.length === 0 && (
+              <tr>
+                <td colSpan="13" className="finance-grouped-empty-cell">
+                  Seçilen filtrelere uygun kayıt bulunamadı.
+                </td>
+              </tr>
+            )}
+
+            {groupedRows.map((group) =>
+              group.items.map((row, rowIndex) => {
+                const rowClasses = [
+                  `finance-row-${row.statusKey}`,
+                  row.id === selectedRowId ? "selected-grid-row" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+
+                return (
+                  <tr
+                    key={row.id}
+                    className={rowClasses}
+                    onClick={() => handleRowClick(row)}
+                  >
+                    {rowIndex === 0 && (
+                      <>
+                        <td rowSpan={group.items.length} className="finance-group-cell">
+                          <strong>{group.contractNumber}</strong>
+                        </td>
+                        <td rowSpan={group.items.length} className="finance-group-cell">
+                          {group.company}
+                        </td>
+                        <td rowSpan={group.items.length} className="finance-group-cell">
+                          {group.workOrder}
+                        </td>
+                        <td rowSpan={group.items.length} className="finance-group-cell">
+                          {group.referenceNumber}
+                        </td>
+                        <td rowSpan={group.items.length} className="finance-group-cell amount">
+                          {formatMoney(group.contractAmount, displayCurrency)}
+                        </td>
+                      </>
+                    )}
+
+                    <td className="finance-milestone-cell">
+                      <strong>{row.milestoneCondition}</strong>
+                      {row.subMilestone && <span>• {row.subMilestone}</span>}
+                    </td>
+                    <td className="finance-center-cell">{row.activeDueDays}</td>
+                    <td className="finance-center-cell">{row.approvalDate || "-"}</td>
+                    <td className="finance-center-cell">{row.paymentDate || "-"}</td>
+                    <td className="finance-center-cell">
+                      {renderInvoiceIssuedCell(row)}
+                    </td>
+                    <td>{renderInvoiceNumberCell(row)}</td>
+                    <td className="finance-amount-cell">
+                      {formatMoney(row.convertedAmount, displayCurrency)}
+                    </td>
+                    <td className="finance-center-cell">
+                      <StatusBadge
+                        statusKey={row.statusKey}
+                        status={row.status}
+                        daysUntilDue={row.daysUntilDue}
+                      />
+                    </td>
+                  </tr>
+                );
+              }),
+            )}
+          </tbody>
+        </table>
       </div>
     </>
   );
