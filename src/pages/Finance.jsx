@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FiPrinter } from "react-icons/fi";
 import {
   buildFinancialAnalysis,
   convertAmount,
@@ -13,7 +14,9 @@ import {
   updatePaymentTracking,
 } from "../services/financeApi";
 import { getCompanies } from "../services/companiesApi";
+import { getContractById } from "../services/contractsApi";
 import { exportRowsToExcel } from "../services/excelExport";
+import { ContractPreview } from "./Contracts";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
 import ExchangeRateSettings from "../components/Finance/ExchangeRateSettings";
@@ -172,6 +175,9 @@ function Finance() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [companyOptions, setCompanyOptions] = useState([]);
+  const [previewContract, setPreviewContract] = useState(null);
+  const [previewContractLoading, setPreviewContractLoading] = useState(false);
+  const [previewContractError, setPreviewContractError] = useState("");
 
   const loadFinanceDashboard = useCallback(async ({ signal } = {}) => {
     await Promise.resolve();
@@ -586,6 +592,31 @@ function Finance() {
     });
   }
 
+  async function handlePreviewContract(contractId) {
+    if (!contractId) return;
+
+    setPreviewContract(null);
+    setPreviewContractError("");
+    setPreviewContractLoading(true);
+
+    try {
+      const contract = await getContractById(contractId);
+      setPreviewContract(contract);
+    } catch (requestError) {
+      setPreviewContractError(
+        requestError.message || "Sözleşme önizlemesi yüklenemedi.",
+      );
+    } finally {
+      setPreviewContractLoading(false);
+    }
+  }
+
+  function closeContractPreview() {
+    setPreviewContract(null);
+    setPreviewContractError("");
+    setPreviewContractLoading(false);
+  }
+
   function handleExchangeRateChange(event) {
     const { name, value } = event.target;
 
@@ -791,6 +822,42 @@ function Finance() {
             error={detailUpdateError}
             saving={detailUpdateSubmitting}
             onSave={handlePaymentTrackingSave}
+            onPreviewContract={handlePreviewContract}
+          />
+        )}
+      </Drawer>
+
+      <Drawer
+        isOpen={previewContractLoading || !!previewContract || !!previewContractError}
+        onClose={closeContractPreview}
+        width={980}
+        hideHeader
+        actions={
+          previewContract && (
+            <button
+              type="button"
+              className="contract-preview-print-btn"
+              onClick={() => window.print()}
+              aria-label="Sözleşme çıktısı al veya PDF olarak kaydet"
+              title="Çıktı al / PDF olarak kaydet"
+            >
+              <FiPrinter aria-hidden="true" />
+            </button>
+          )
+        }
+      >
+        {previewContractLoading && (
+          <div className="finance-status">Sözleşme önizlemesi yükleniyor...</div>
+        )}
+
+        {!previewContractLoading && previewContractError && (
+          <div className="finance-status error">{previewContractError}</div>
+        )}
+
+        {!previewContractLoading && previewContract && (
+          <ContractPreview
+            contract={previewContract}
+            onCancel={closeContractPreview}
           />
         )}
       </Drawer>

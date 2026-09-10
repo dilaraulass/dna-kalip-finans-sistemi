@@ -9,9 +9,17 @@
 }
 
 .finance-detail-section h3 {
-  margin: 0 0 15px;
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
+}
+
+.finance-detail-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
 }
 
 .finance-detail-grid {
@@ -36,6 +44,40 @@
 .finance-detail-grid strong {
   font-size: 14px;
   color: #111827;
+}
+
+.finance-detail-contract-preview-btn {
+  min-height: 34px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.finance-detail-contract-preview-btn:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.finance-detail-contract-preview-btn:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .finance-detail-note {

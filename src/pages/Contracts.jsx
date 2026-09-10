@@ -697,6 +697,23 @@ function ContractsPage() {
   const [archiveError, setArchiveError] = useState("");
   const [archiveSubmitting, setArchiveSubmitting] = useState(false);
 
+  async function openContractDetail(contractId) {
+    setSelectedContractId(contractId);
+    setSelectedContract(null);
+    setDetailError("");
+    setDetailLoading(true);
+    setPreviewDrawerOpen(false);
+
+    try {
+      const detail = await getContractById(contractId);
+      setSelectedContract(detail);
+    } catch {
+      setDetailError("Sözleşme detayı yüklenirken bir hata oluştu.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -844,20 +861,8 @@ function ContractsPage() {
     return baseColumns;
   }, [contractArchiveStatus]);
 
-  async function handleContractSelect(contractId) {
-    setSelectedContractId(contractId);
-    setSelectedContract(null);
-    setDetailError("");
-    setDetailLoading(true);
-
-    try {
-      const detail = await getContractById(contractId);
-      setSelectedContract(detail);
-    } catch {
-      setDetailError("Sözleşme detayı yüklenirken bir hata oluştu.");
-    } finally {
-      setDetailLoading(false);
-    }
+  function handleContractSelect(contractId) {
+    openContractDetail(contractId);
   }
 
   function closeDrawer() {
@@ -1648,7 +1653,7 @@ function CreateContractForm({
   );
 }
 
-function ContractPreview({ contract, onCancel }) {
+export function ContractPreview({ contract, onCancel }) {
   const previewForm = buildContractFormFromDetail(contract);
 
   function handlePreviewSubmit(event) {

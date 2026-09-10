@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FiFileText } from "react-icons/fi";
 import "./FinanceDetail.css";
 import {
   PAYMENT_STATUSES,
@@ -17,12 +18,33 @@ function getInitialForm(selectedRow) {
   };
 }
 
+function calculatePaymentDate(approvalDate, dueDays) {
+  const parsedDueDays = Number.parseInt(dueDays, 10);
+
+  if (!approvalDate || !Number.isFinite(parsedDueDays)) {
+    return "";
+  }
+
+  const [year, month, day] = approvalDate.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return "";
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  date.setUTCDate(date.getUTCDate() + parsedDueDays);
+
+  return date.toISOString().slice(0, 10);
+}
+
 function FinanceDetail({
   selectedRow,
   displayCurrency,
   error = "",
   saving = false,
   onSave,
+  onPreviewContract,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
 
@@ -31,11 +53,32 @@ function FinanceDetail({
   function handleChange(event) {
     const { checked, name, type, value } = event.target;
 
-    setForm((currentForm) => ({
-      ...currentForm,
-      [name]: type === "checkbox" ? checked : value,
-      ...(name === "invoiceIssued" && !checked ? { invoiceNumber: "" } : {}),
-    }));
+    setForm((currentForm) => {
+      const nextForm = {
+        ...currentForm,
+        [name]: type === "checkbox" ? checked : value,
+        ...(name === "invoiceIssued" && !checked ? { invoiceNumber: "" } : {}),
+      };
+
+      if (name === "approvalDate" || name === "dueDays") {
+        const previousAutoPaymentDate = calculatePaymentDate(
+          currentForm.approvalDate,
+          currentForm.dueDays,
+        );
+        const shouldUpdatePaymentDate =
+          !currentForm.paymentDate ||
+          currentForm.paymentDate === previousAutoPaymentDate;
+
+        if (shouldUpdatePaymentDate) {
+          nextForm.paymentDate = calculatePaymentDate(
+            nextForm.approvalDate,
+            nextForm.dueDays,
+          );
+        }
+      }
+
+      return nextForm;
+    });
   }
 
   function handleSubmit(event) {
@@ -67,7 +110,20 @@ function FinanceDetail({
       </div>
 
       <div className="finance-detail-section">
-        <h3>Sözleşme Bilgileri</h3>
+        <div className="finance-detail-section-title-row">
+          <h3>Sözleşme Bilgileri</h3>
+          <button
+            type="button"
+            className="finance-detail-contract-preview-btn"
+            onClick={() => onPreviewContract?.(selectedRow.contractId)}
+            disabled={!selectedRow.contractId}
+            aria-label={`${selectedRow.contractNumber} sözleşmesini önizle`}
+            title="Sözleşme önizlemesini aç"
+          >
+            <FiFileText />
+            <span>Sözleşme Önizle</span>
+          </button>
+        </div>
 
         <div className="finance-detail-grid">
           <div>
