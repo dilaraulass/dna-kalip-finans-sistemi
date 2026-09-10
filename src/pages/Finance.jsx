@@ -153,6 +153,7 @@ function Finance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [detailUpdateError, setDetailUpdateError] = useState("");
+  const [inlineUpdateError, setInlineUpdateError] = useState("");
   const [detailUpdateSubmitting, setDetailUpdateSubmitting] = useState(false);
   const [detailArchiveSubmitting, setDetailArchiveSubmitting] = useState(false);
   const [exchangeRateForm, setExchangeRateForm] = useState(
@@ -485,6 +486,7 @@ function Finance() {
     setSelectedRow(null);
     setSelectedRowId(null);
     setDetailUpdateError("");
+    setInlineUpdateError("");
     setDetailArchiveSubmitting(false);
   };
 
@@ -561,6 +563,101 @@ function Finance() {
     } finally {
       setDetailArchiveSubmitting(false);
     }
+  }
+
+  async function handlePaymentInvoiceInlineUpdate(row, invoiceFields) {
+    if (invoiceFields.invoiceIssued && !invoiceFields.invoiceNumber.trim()) {
+      setInlineUpdateError("Fatura kesildiyse fatura no zorunludur.");
+      return;
+    }
+
+    const dueDaysOverride =
+      row.activeDueDays === row.defaultDueDays ? null : row.activeDueDays;
+
+    const payload = {
+      approvalDate: row.approvalDate || null,
+      paymentDate: row.paymentDate || null,
+      status: row.paymentStatus,
+      dueDaysOverride,
+      invoiceIssued: invoiceFields.invoiceIssued,
+      invoiceNumber: invoiceFields.invoiceIssued
+        ? invoiceFields.invoiceNumber.trim()
+        : null,
+    };
+
+    try {
+      setInlineUpdateError("");
+      await updatePaymentTracking(row.id, payload);
+      await loadFinanceDashboard();
+
+      setSelectedRow((currentRow) =>
+        currentRow?.id === row.id
+          ? {
+              ...currentRow,
+              invoiceIssued: invoiceFields.invoiceIssued,
+              invoiceNumber: invoiceFields.invoiceIssued
+                ? invoiceFields.invoiceNumber.trim()
+                : "",
+            }
+          : currentRow,
+      );
+    } catch (requestError) {
+      const message =
+        requestError.message || "Fatura bilgileri güncellenemedi.";
+      setInlineUpdateError(message);
+      throw requestError;
+    }
+  }
+
+  async function handleExpenseInvoiceInlineUpdate(row, invoiceFields) {
+    if (invoiceFields.invoiceIssued && !invoiceFields.invoiceNumber.trim()) {
+      setInlineUpdateError("Fatura kesildiyse fatura no zorunludur.");
+      return;
+    }
+
+    const payload = {
+      companyId: row.companyId || null,
+      workOrderNumber: row.workOrder === "GENEL" ? null : row.workOrder || null,
+      invoiceType: row.invoiceType || null,
+      description: row.company,
+      amount: row.amount,
+      currency: row.currency,
+      invoiceDate: row.invoiceDate,
+      dueDays: row.dueDays,
+      paymentDate: row.paymentDate || null,
+      status: row.paymentStatus,
+      invoiceIssued: invoiceFields.invoiceIssued,
+      invoiceNumber: invoiceFields.invoiceIssued
+        ? invoiceFields.invoiceNumber.trim()
+        : null,
+    };
+
+    try {
+      setInlineUpdateError("");
+      await updateExpenseInvoice(row.id, payload);
+      await loadFinanceDashboard();
+
+      setSelectedRow((currentRow) =>
+        currentRow?.id === row.id
+          ? {
+              ...currentRow,
+              invoiceIssued: invoiceFields.invoiceIssued,
+              invoiceNumber: invoiceFields.invoiceIssued
+                ? invoiceFields.invoiceNumber.trim()
+                : "",
+            }
+          : currentRow,
+      );
+    } catch (requestError) {
+      const message =
+        requestError.message || "Fatura bilgileri güncellenemedi.";
+      setInlineUpdateError(message);
+      throw requestError;
+    }
+  }
+
+  function handleInvoiceInlineValidationError(message) {
+    setInlineUpdateError(message);
   }
 
   function handlePaymentExcelExport() {
@@ -708,6 +805,10 @@ function Finance() {
         />
       )}
 
+      {!loading && !error && inlineUpdateError && (
+        <div className="finance-status error">{inlineUpdateError}</div>
+      )}
+
       {!loading && !error && (
         <div className="dashboard-section">
           {paymentModule && (
@@ -730,10 +831,13 @@ function Finance() {
               selectedRowId={selectedRowId}
               setSelectedRow={(row) => {
                 setDetailUpdateError("");
+                setInlineUpdateError("");
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
               onExportExcel={handlePaymentExcelExport}
+              onInvoiceInlineUpdate={handlePaymentInvoiceInlineUpdate}
+              onInvoiceInlineValidationError={handleInvoiceInlineValidationError}
             />
           )}
           {activeTab === FINANCE_MODULES.expenses && (
@@ -759,11 +863,14 @@ function Finance() {
               selectedRowId={selectedRowId}
               setSelectedRow={(row) => {
                 setDetailUpdateError("");
+                setInlineUpdateError("");
                 setSelectedRow(row);
               }}
               setSelectedRowId={setSelectedRowId}
               onCreateInvoice={handleCreateExpenseInvoice}
               onExportExcel={handleExpenseExcelExport}
+              onInvoiceInlineUpdate={handleExpenseInvoiceInlineUpdate}
+              onInvoiceInlineValidationError={handleInvoiceInlineValidationError}
             />
           )}
           {activeTab === FINANCE_MODULES.analysis && (

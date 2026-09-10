@@ -1,5 +1,6 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
+import { useState } from "react";
 import {
   ALL_FILTER_VALUE,
   CURRENCY_OPTIONS,
@@ -37,7 +38,63 @@ function ExpenseInvoiceTable({
   setSelectedRowId,
   onCreateInvoice,
   onExportExcel,
+  onInvoiceInlineUpdate,
+  onInvoiceInlineValidationError,
 }) {
+  const [invoiceDrafts, setInvoiceDrafts] = useState({});
+  const [savingInvoiceIds, setSavingInvoiceIds] = useState({});
+
+  function getInvoiceDraft(row) {
+    return (
+      invoiceDrafts[row.id] || {
+        invoiceIssued: Boolean(row.invoiceIssued),
+        invoiceNumber: row.invoiceNumber || "",
+      }
+    );
+  }
+
+  function setInvoiceDraft(row, draft) {
+    setInvoiceDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [row.id]: draft,
+    }));
+  }
+
+  async function commitInvoiceDraft(row, draft) {
+    const normalizedDraft = {
+      invoiceIssued: Boolean(draft.invoiceIssued),
+      invoiceNumber: draft.invoiceNumber.trim(),
+    };
+
+    if (normalizedDraft.invoiceIssued && !normalizedDraft.invoiceNumber) {
+      onInvoiceInlineValidationError?.("Fatura kesildiyse fatura no zorunludur.");
+      return;
+    }
+
+    setSavingInvoiceIds((currentIds) => ({ ...currentIds, [row.id]: true }));
+
+    try {
+      await onInvoiceInlineUpdate?.(row, normalizedDraft);
+      setInvoiceDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts };
+        delete nextDrafts[row.id];
+        return nextDrafts;
+      });
+    } catch {
+      // Hata mesajı parent bileşende gösteriliyor; draft korunur.
+    } finally {
+      setSavingInvoiceIds((currentIds) => {
+        const nextIds = { ...currentIds };
+        delete nextIds[row.id];
+        return nextIds;
+      });
+    }
+  }
+
+  function stopGridEvent(event) {
+    event.stopPropagation();
+  }
+
   const columns = [
     { field: "workOrder", headerName: "İş Emri", width: 110 },
     { field: "invoiceType", headerName: "Gider Türü", width: 160 },
@@ -53,11 +110,70 @@ function ExpenseInvoiceTable({
       field: "invoiceIssued",
       headerName: "Fatura Kesildi",
       width: 135,
-      renderCell: ({ row }) => (
-        <input type="checkbox" checked={row.invoiceIssued} readOnly />
-      ),
+      sortable: false,
+      renderCell: ({ row }) => {
+        const draft = getInvoiceDraft(row);
+        const isSaving = Boolean(savingInvoiceIds[row.id]);
+
+        return (
+          <input
+            type="checkbox"
+            className="finance-inline-checkbox"
+            checked={draft.invoiceIssued}
+            disabled={isSaving}
+            onClick={stopGridEvent}
+            onChange={(event) => {
+              const nextDraft = {
+                invoiceIssued: event.target.checked,
+                invoiceNumber: event.target.checked ? draft.invoiceNumber : "",
+              };
+
+              setInvoiceDraft(row, nextDraft);
+
+              if (!nextDraft.invoiceIssued || nextDraft.invoiceNumber.trim()) {
+                commitInvoiceDraft(row, nextDraft);
+              }
+            }}
+          />
+        );
+      },
     },
-    { field: "invoiceNumber", headerName: "Fatura No", width: 140 },
+    {
+      field: "invoiceNumber",
+      headerName: "Fatura No",
+      width: 150,
+      sortable: false,
+      renderCell: ({ row }) => {
+        const draft = getInvoiceDraft(row);
+        const isSaving = Boolean(savingInvoiceIds[row.id]);
+
+        return (
+          <input
+            type="text"
+            className="finance-inline-input"
+            value={draft.invoiceNumber}
+            disabled={!draft.invoiceIssued || isSaving}
+            placeholder={draft.invoiceIssued ? "Fatura no" : "-"}
+            onClick={stopGridEvent}
+            onDoubleClick={stopGridEvent}
+            onChange={(event) =>
+              setInvoiceDraft(row, {
+                ...draft,
+                invoiceNumber: event.target.value,
+              })
+            }
+            onBlur={() => commitInvoiceDraft(row, draft)}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+          />
+        );
+      },
+    },
     { field: "dueDays", headerName: "Vade", width: 80 },
     { field: "paymentDate", headerName: "Ödeme Tarihi", width: 125 },
     {
