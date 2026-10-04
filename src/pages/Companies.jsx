@@ -225,7 +225,7 @@ function CompaniesPage() {
       },
       {
         field: "archivedContractCount",
-        headerName: "Arşiv",
+        headerName: "Silinen",
         width: 105,
       },
     ],
@@ -460,7 +460,7 @@ function CompanyDetail({ company, onEdit }) {
                 </div>
                 <div>
                   <strong>{formatMoney(contract.totalAmount, contract.currency)}</strong>
-                  <span>{contract.isArchived ? "Arşiv" : "Aktif"}</span>
+                  <span>{contract.isArchived ? "Silinen" : "Aktif"}</span>
                 </div>
               </div>
             ))}

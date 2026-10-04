@@ -51,6 +51,10 @@ export function getExchangeRates({ signal } = {}) {
   return request("/finance/exchange-rates", { signal });
 }
 
+export function getLiveExchangeRates({ signal } = {}) {
+  return request("/finance/exchange-rates/live", { signal });
+}
+
 export function updateExchangeRate(currency, payload, { signal } = {}) {
   return request(`/finance/exchange-rates/${currency}`, {
     method: "PUT",

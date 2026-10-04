@@ -2,6 +2,7 @@ export const FINANCE_MODULES = {
   supplier: "supplier",
   customer: "customer",
   expenses: "expenses",
+  invoiceArchive: "invoiceArchive",
   analysis: "analysis",
 };
 

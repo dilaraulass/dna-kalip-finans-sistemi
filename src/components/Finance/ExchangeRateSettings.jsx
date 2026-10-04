@@ -1,11 +1,14 @@
 import { CURRENCIES } from "../../constants/financeConstants";
+import { FiRefreshCw } from "react-icons/fi";
 
 function ExchangeRateSettings({
   form,
   error,
   saving,
+  fetchingLiveRates,
   onChange,
   onSubmit,
+  onFetchLiveRates,
 }) {
   return (
     <form className="exchange-rate-settings" onSubmit={onSubmit}>
@@ -46,8 +49,23 @@ function ExchangeRateSettings({
           />
         </label>
 
-        <button type="submit" className="finance-primary-btn" disabled={saving}>
+        <button
+          type="submit"
+          className="finance-primary-btn"
+          disabled={saving || fetchingLiveRates}
+        >
           {saving ? "Kaydediliyor..." : "Kurları Güncelle"}
+        </button>
+
+        <button
+          type="button"
+          className="finance-secondary-btn exchange-live-rate-btn"
+          onClick={onFetchLiveRates}
+          disabled={saving || fetchingLiveRates}
+          title="Güncel TCMB kur verilerini çek"
+        >
+          <FiRefreshCw aria-hidden="true" />
+          {fetchingLiveRates ? "Çekiliyor..." : "Güncel Kuru Çek"}
         </button>
       </div>
 

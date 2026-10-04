@@ -9,6 +9,7 @@ import {
   archiveExpenseInvoice,
   createExpenseInvoice,
   getFinanceDashboard,
+  getLiveExchangeRates,
   updateExchangeRate,
   updateExpenseInvoice,
   updatePaymentTracking,
@@ -24,6 +25,7 @@ import ExpenseInvoiceTable from "../components/Finance/ExpenseInvoiceTable";
 import FinancialAnalysis from "../components/Finance/FinancialAnalysis";
 import FinanceStatusCards from "../components/Finance/FinanceStatusCards";
 import FinanceTabs from "../components/Finance/FinanceTabs";
+import InvoiceArchiveTable from "../components/Finance/InvoiceArchiveTable";
 import PaymentMilestoneTable from "../components/Finance/PaymentMilestoneTable";
 import FinanceDetail from "../components/FinanceDetail/FinanceDetail";
 import ExpenseDetail from "../components/ExpenseDetail/ExpenseDetail";
@@ -84,7 +86,15 @@ function getPaymentExportColumns({ companyLabel, displayCurrency }) {
     {
       label: "Sözleşme Bedeli",
       width: 140,
-      value: (row) => formatMoney(row.convertedContractAmount, displayCurrency),
+      value: (row) => {
+        const originalAmount = formatMoney(row.contractAmount, row.contractCurrency);
+
+        if (row.contractCurrency === displayCurrency) {
+          return originalAmount;
+        }
+
+        return `${originalAmount} / ${formatMoney(row.convertedContractAmount, displayCurrency)}`;
+      },
     },
     {
       label: "Hakediş Şartı",
@@ -144,6 +154,31 @@ function getExpenseExportColumns({ displayCurrency }) {
   ];
 }
 
+function getInvoiceArchiveExportColumns({ displayCurrency }) {
+  return [
+    { label: "Kaynak", width: 150, value: (row) => row.sourceLabel },
+    { label: "Belge / Sözleşme", width: 160, value: (row) => row.documentNumber },
+    { label: "Firma", width: 190, value: (row) => row.company },
+    { label: "İş Emri", width: 110, value: (row) => row.workOrder || "" },
+    { label: "Fatura No", width: 140, value: (row) => row.invoiceNumber || "" },
+    { label: "Fatura Tarihi", width: 120, value: (row) => row.invoiceDate || "" },
+    {
+      label: "Tutar",
+      width: 160,
+      value: (row) => {
+        const originalAmount = formatMoney(row.originalAmount, row.currency);
+
+        if (row.currency === displayCurrency) {
+          return originalAmount;
+        }
+
+        return `${originalAmount} / ${formatMoney(row.convertedAmount, displayCurrency)}`;
+      },
+    },
+    { label: "Durum", width: 120, value: (row) => row.status },
+  ];
+}
+
 function Finance() {
   const [financeData, setFinanceData] = useState({
     paymentMilestones: [],
@@ -161,6 +196,7 @@ function Finance() {
   );
   const [exchangeRateError, setExchangeRateError] = useState("");
   const [exchangeRateSubmitting, setExchangeRateSubmitting] = useState(false);
+  const [exchangeRateFetching, setExchangeRateFetching] = useState(false);
   const [activeTab, setActiveTab] = useState(FINANCE_MODULES.supplier);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState(STATUS_KEYS.all);
@@ -297,6 +333,59 @@ function Finance() {
         ),
       })),
     [displayCurrency, financeData],
+  );
+
+  const invoiceArchiveRows = useMemo(
+    () => [
+      ...supplierRows
+        .filter((row) => row.invoiceIssued)
+        .map((row) => ({
+          archiveId: `supplier-${row.id}`,
+          sourceLabel: "Tedarikçi Ödemesi",
+          documentNumber: row.contractNumber,
+          company: row.company,
+          workOrder: row.workOrder,
+          invoiceNumber: row.invoiceNumber,
+          invoiceDate: row.paymentDate || row.approvalDate || row.contractDate,
+          originalAmount: row.amount,
+          convertedAmount: row.convertedAmount,
+          currency: row.currency,
+          status: row.status,
+        })),
+      ...customerRows
+        .filter((row) => row.invoiceIssued)
+        .map((row) => ({
+          archiveId: `customer-${row.id}`,
+          sourceLabel: "Müşteri Tahsilatı",
+          documentNumber: row.contractNumber,
+          company: row.company,
+          workOrder: row.workOrder,
+          invoiceNumber: row.invoiceNumber,
+          invoiceDate: row.paymentDate || row.approvalDate || row.contractDate,
+          originalAmount: row.amount,
+          convertedAmount: row.convertedAmount,
+          currency: row.currency,
+          status: row.status,
+        })),
+      ...expenseRows
+        .filter((row) => row.invoiceIssued)
+        .map((row) => ({
+          archiveId: `expense-${row.id}`,
+          sourceLabel: "Ek Gider Faturası",
+          documentNumber: row.invoiceType || "-",
+          company: row.company,
+          workOrder: row.workOrder,
+          invoiceNumber: row.invoiceNumber,
+          invoiceDate: row.invoiceDate,
+          originalAmount: row.amount,
+          convertedAmount: row.convertedAmount,
+          currency: row.currency,
+          status: row.status,
+        })),
+    ].sort((first, second) =>
+      (second.invoiceDate || "").localeCompare(first.invoiceDate || ""),
+    ),
+    [customerRows, expenseRows, supplierRows],
   );
 
   const analysisWorkOrders = useMemo(
@@ -477,6 +566,22 @@ function Finance() {
       );
     });
 
+  const filteredInvoiceArchiveRows = invoiceArchiveRows.filter((row) => {
+    const search = searchText.trim().toLocaleLowerCase("tr-TR");
+    const matchesSearch =
+      !search ||
+      row.sourceLabel.toLocaleLowerCase("tr-TR").includes(search) ||
+      row.documentNumber.toLocaleLowerCase("tr-TR").includes(search) ||
+      row.company.toLocaleLowerCase("tr-TR").includes(search) ||
+      (row.workOrder || "").toLocaleLowerCase("tr-TR").includes(search) ||
+      (row.invoiceNumber || "").toLocaleLowerCase("tr-TR").includes(search);
+    const matchesDate =
+      (!dateStart || (row.invoiceDate && row.invoiceDate >= dateStart)) &&
+      (!dateEnd || (row.invoiceDate && row.invoiceDate <= dateEnd));
+
+    return matchesSearch && matchesDate;
+  });
+
   const changePaymentModule = (module) => {
     setActiveTab(module);
     setStatusFilter(STATUS_KEYS.all);
@@ -544,7 +649,7 @@ function Finance() {
     if (!selectedRow || selectedRow.isNew || detailArchiveSubmitting) return;
 
     const confirmed = window.confirm(
-      `${selectedRow.company} faturası arşivlenecek. Arşivlenen fatura finans toplamlarına dahil edilmez. Devam edilsin mi?`,
+      `${selectedRow.company} faturası silinenlere taşınacak. Bu fatura finans toplamlarına dahil edilmez. Devam edilsin mi?`,
     );
 
     if (!confirmed) return;
@@ -558,7 +663,7 @@ function Finance() {
       setSelectedRowId(null);
     } catch (requestError) {
       setDetailUpdateError(
-        requestError.message || "Fatura arşivlenemedi.",
+        requestError.message || "Fatura silinenlere taşınamadı.",
       );
     } finally {
       setDetailArchiveSubmitting(false);
@@ -689,6 +794,16 @@ function Finance() {
     });
   }
 
+  function handleInvoiceArchiveExcelExport() {
+    exportRowsToExcel({
+      filenamePrefix: "arsivlenen-faturalar",
+      title: "Arşivlenenler",
+      description: `${filteredInvoiceArchiveRows.length} faturası kesilmiş kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
+      columns: getInvoiceArchiveExportColumns({ displayCurrency }),
+      rows: filteredInvoiceArchiveRows,
+    });
+  }
+
   async function handlePreviewContract(contractId) {
     if (!contractId) return;
 
@@ -758,10 +873,56 @@ function Finance() {
     }
   }
 
+  async function handleFetchLiveExchangeRates() {
+    const confirmed = window.confirm(
+      "Güncel TCMB EUR/USD satış kurları çekilecek ve mevcut kur değerlerinin üzerine kaydedilecek. Devam etmek istiyor musunuz?",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setExchangeRateFetching(true);
+      setExchangeRateError("");
+
+      const liveRates = await getLiveExchangeRates();
+      const eurRate = Number(liveRates?.exchangeRates?.[CURRENCIES.eur]);
+      const usdRate = Number(liveRates?.exchangeRates?.[CURRENCIES.usd]);
+
+      if (!Number.isFinite(eurRate) || !Number.isFinite(usdRate)) {
+        throw new Error("Canlı kur verisi beklenen formatta gelmedi.");
+      }
+
+      await Promise.all([
+        updateExchangeRate(CURRENCIES.eur, {
+          rateToTry: eurRate,
+          effectiveDate: liveRates.effectiveDate,
+        }),
+        updateExchangeRate(CURRENCIES.usd, {
+          rateToTry: usdRate,
+          effectiveDate: liveRates.effectiveDate,
+        }),
+      ]);
+
+      setExchangeRateForm(buildExchangeRateForm({
+        [CURRENCIES.eur]: eurRate,
+        [CURRENCIES.usd]: usdRate,
+      }));
+
+      await loadFinanceDashboard();
+    } catch (requestError) {
+      setExchangeRateError(
+        requestError.message || "Güncel kur bilgileri çekilemedi.",
+      );
+    } finally {
+      setExchangeRateFetching(false);
+    }
+  }
+
   const paymentModule =
     activeTab === FINANCE_MODULES.supplier ||
     activeTab === FINANCE_MODULES.customer;
   const expenseModule = activeTab === FINANCE_MODULES.expenses;
+  const invoiceArchiveModule = activeTab === FINANCE_MODULES.invoiceArchive;
   const companyLabel =
     activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi";
   const transactionLabel =
@@ -800,8 +961,10 @@ function Finance() {
           form={exchangeRateForm}
           error={exchangeRateError}
           saving={exchangeRateSubmitting}
+          fetchingLiveRates={exchangeRateFetching}
           onChange={handleExchangeRateChange}
           onSubmit={handleExchangeRateSubmit}
+          onFetchLiveRates={handleFetchLiveExchangeRates}
         />
       )}
 
@@ -871,6 +1034,20 @@ function Finance() {
               onExportExcel={handleExpenseExcelExport}
               onInvoiceInlineUpdate={handleExpenseInvoiceInlineUpdate}
               onInvoiceInlineValidationError={handleInvoiceInlineValidationError}
+            />
+          )}
+          {invoiceArchiveModule && (
+            <InvoiceArchiveTable
+              rows={filteredInvoiceArchiveRows}
+              dateStart={dateStart}
+              setDateStart={setDateStart}
+              dateEnd={dateEnd}
+              setDateEnd={setDateEnd}
+              displayCurrency={displayCurrency}
+              setDisplayCurrency={setDisplayCurrency}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              onExportExcel={handleInvoiceArchiveExcelExport}
             />
           )}
           {activeTab === FINANCE_MODULES.analysis && (

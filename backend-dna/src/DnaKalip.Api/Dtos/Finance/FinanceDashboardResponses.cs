@@ -11,6 +11,11 @@ public sealed record ExchangeRateResponse(
     DateOnly EffectiveDate,
     DateTimeOffset CreatedAt);
 
+public sealed record LiveExchangeRatesResponse(
+    IReadOnlyDictionary<string, decimal> ExchangeRates,
+    DateOnly EffectiveDate,
+    string Source);
+
 public sealed record FinancePaymentMilestoneResponse(
     Guid Id,
     Guid ContractId,

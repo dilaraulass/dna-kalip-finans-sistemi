@@ -99,7 +99,9 @@ function PaymentMilestoneTable({
           company: row.company,
           workOrder: row.workOrder,
           referenceNumber: row.referenceNumber,
-          contractAmount: row.convertedContractAmount,
+          contractAmount: row.contractAmount,
+          contractCurrency: row.contractCurrency,
+          convertedContractAmount: row.convertedContractAmount,
           items: [],
         };
         groupMap.set(groupKey, group);
@@ -326,7 +328,17 @@ function PaymentMilestoneTable({
                           {group.referenceNumber}
                         </td>
                         <td rowSpan={group.items.length} className="finance-group-cell amount">
-                          {formatMoney(group.contractAmount, displayCurrency)}
+                          <strong>
+                            {formatMoney(group.contractAmount, group.contractCurrency)}
+                          </strong>
+                          {group.contractCurrency !== displayCurrency && (
+                            <span>
+                              {formatMoney(
+                                group.convertedContractAmount,
+                                displayCurrency,
+                              )}
+                            </span>
+                          )}
                         </td>
                       </>
                     )}

@@ -4,6 +4,7 @@ const FINANCE_TAB_OPTIONS = [
   { key: FINANCE_MODULES.supplier, label: "Tedarikçi Ödemeleri" },
   { key: FINANCE_MODULES.customer, label: "Müşteri Tahsilatları" },
   { key: FINANCE_MODULES.expenses, label: "Ek Gider Faturaları" },
+  { key: FINANCE_MODULES.invoiceArchive, label: "Arşivlenenler" },
   { key: FINANCE_MODULES.analysis, label: "Finansal Analiz" },
 ];
 

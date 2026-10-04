@@ -41,7 +41,7 @@ const CONTRACT_ARCHIVE_STATUSES = {
 
 const CONTRACT_ARCHIVE_STATUS_OPTIONS = [
   { value: CONTRACT_ARCHIVE_STATUSES.active, label: "Aktif" },
-  { value: CONTRACT_ARCHIVE_STATUSES.archived, label: "Arşiv" },
+  { value: CONTRACT_ARCHIVE_STATUSES.archived, label: "Silinenler" },
 ];
 
 const currencyFormatter = new Intl.NumberFormat("tr-TR", {
@@ -788,10 +788,10 @@ function ContractsPage() {
   const isArchivedView =
     contractArchiveStatus === CONTRACT_ARCHIVE_STATUSES.archived;
   const contractListTitle = isArchivedView
-    ? "Arşivlenmiş Sözleşmeler"
+    ? "Silinen Sözleşmeler"
     : "Sözleşmeler";
   const contractListDescription = isArchivedView
-    ? `${filteredContracts.length} arşiv kaydı gösteriliyor`
+    ? `${filteredContracts.length} silinen kayıt gösteriliyor`
     : `${filteredContracts.length} kayıt gösteriliyor`;
 
   const columns = useMemo(() => {
@@ -853,7 +853,7 @@ function ContractsPage() {
     if (contractArchiveStatus === CONTRACT_ARCHIVE_STATUSES.archived) {
       baseColumns.splice(5, 0, {
         field: "archivedAt",
-        headerName: "Arşiv Tarihi",
+        headerName: "Silinme Tarihi",
         width: 150,
         valueFormatter: (value) => formatDateTime(value),
       });
@@ -1012,7 +1012,7 @@ function ContractsPage() {
     if (!selectedContract || archiveSubmitting) return;
 
     const confirmed = window.confirm(
-      `${selectedContract.contractNumber} numaralı sözleşme arşivlenecek. Arşivlenen sözleşme ana listede ve finans ekranında görünmez. Devam edilsin mi?`,
+      `${selectedContract.contractNumber} numaralı sözleşme silinenlere taşınacak. Bu sözleşme ana listede ve finans ekranında görünmez. Devam edilsin mi?`,
     );
 
     if (!confirmed) return;
@@ -1030,7 +1030,7 @@ function ContractsPage() {
       setContracts(refreshedContracts);
       closeDrawer();
     } catch (requestError) {
-      setArchiveError(requestError.message || "Sözleşme arşivlenemedi.");
+      setArchiveError(requestError.message || "Sözleşme silinenlere taşınamadı.");
     } finally {
       setArchiveSubmitting(false);
     }
@@ -1040,7 +1040,7 @@ function ContractsPage() {
     if (!selectedContract || archiveSubmitting) return;
 
     const confirmed = window.confirm(
-      `${selectedContract.contractNumber} numaralı sözleşme arşivden çıkarılacak ve aktif listeye geri alınacak. Devam edilsin mi?`,
+      `${selectedContract.contractNumber} numaralı sözleşme silinenlerden çıkarılacak ve aktif listeye geri alınacak. Devam edilsin mi?`,
     );
 
     if (!confirmed) return;
@@ -1058,7 +1058,7 @@ function ContractsPage() {
       setContracts(refreshedContracts);
       closeDrawer();
     } catch (requestError) {
-      setArchiveError(requestError.message || "Sözleşme arşivden çıkarılamadı.");
+      setArchiveError(requestError.message || "Sözleşme silinenlerden çıkarılamadı.");
     } finally {
       setArchiveSubmitting(false);
     }
@@ -2493,7 +2493,7 @@ function ContractDetail({
               onClick={onArchive}
               disabled={archiveSubmitting}
             >
-              {archiveSubmitting ? "Arşivleniyor..." : "Arşivle"}
+              {archiveSubmitting ? "Taşınıyor..." : "Silinenlere Taşı"}
             </button>
             <button
               type="button"
@@ -2511,7 +2511,7 @@ function ContractDetail({
             onClick={onRestore}
             disabled={archiveSubmitting}
           >
-            {archiveSubmitting ? "Geri alınıyor..." : "Arşivden Çıkar"}
+            {archiveSubmitting ? "Geri alınıyor..." : "Silinenlerden Çıkar"}
           </button>
         )}
         <button type="button" className="contracts-primary-btn" onClick={onPreview}>
@@ -2532,7 +2532,7 @@ function ContractDetail({
           <DetailField label="Parça" value={contract.partName} />
           {isArchived && (
             <DetailField
-              label="Arşiv Tarihi"
+              label="Silinme Tarihi"
               value={formatDateTime(contract.archivedAt)}
             />
           )}

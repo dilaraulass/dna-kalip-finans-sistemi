@@ -322,7 +322,7 @@ function ExpenseDetail({
               onClick={onArchive}
               disabled={saving || archiving}
             >
-              {archiving ? "Arşivleniyor..." : "Arşivle"}
+              {archiving ? "Taşınıyor..." : "Silinenlere Taşı"}
             </button>
           )}
         </div>

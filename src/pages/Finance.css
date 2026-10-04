@@ -214,6 +214,32 @@
   cursor: not-allowed;
 }
 
+.finance-secondary-btn {
+  height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.finance-secondary-btn:hover {
+  background: #e2e8f0;
+}
+
+.finance-secondary-btn:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.exchange-live-rate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .finance-inline-checkbox {
   width: 18px;
   height: 18px;
@@ -307,6 +333,18 @@
   white-space: nowrap;
 }
 
+.finance-group-cell.amount strong,
+.finance-group-cell.amount span {
+  display: block;
+}
+
+.finance-group-cell.amount span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .finance-milestone-cell {
   min-width: 240px;
 }
@@ -333,6 +371,22 @@
   text-align: right;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.finance-amount-cell strong,
+.finance-amount-cell span {
+  display: block;
+}
+
+.finance-amount-cell span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.invoice-archive-table {
+  min-width: 1080px;
 }
 
 .finance-grouped-empty-cell {

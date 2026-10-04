@@ -3,12 +3,15 @@ using DnaKalip.Api.Domain;
 using DnaKalip.Api.Dtos.Finance;
 using DnaKalip.Api.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Xml.Linq;
 
 namespace DnaKalip.Api.Endpoints;
 
 public static class FinanceEndpoints
 {
     private const int ApproachingDueDays = 14;
+    private const string TcmbTodayRatesUrl = "https://www.tcmb.gov.tr/kurlar/today.xml";
 
     public static IEndpointRouteBuilder MapFinanceEndpoints(this IEndpointRouteBuilder app)
     {
@@ -240,6 +243,51 @@ public static class FinanceEndpoints
             return Results.Ok(rates);
         })
         .WithName("GetExchangeRates");
+
+        group.MapGet("/exchange-rates/live", async (
+            HttpClient httpClient,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                using var response = await httpClient.GetAsync(
+                    TcmbTodayRatesUrl,
+                    cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Results.Problem(
+                        "TCMB kur servisine ulaşılamadı.",
+                        statusCode: StatusCodes.Status502BadGateway);
+                }
+
+                var xmlContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                var document = XDocument.Parse(xmlContent);
+                var effectiveDate = GetTcmbEffectiveDate(document);
+                var exchangeRates = new Dictionary<string, decimal>
+                {
+                    [Currencies.Try] = 1,
+                    [Currencies.Eur] = GetTcmbSellingRate(document, Currencies.Eur),
+                    [Currencies.Usd] = GetTcmbSellingRate(document, Currencies.Usd),
+                };
+
+                return Results.Ok(new LiveExchangeRatesResponse(
+                    exchangeRates,
+                    effectiveDate,
+                    "TCMB Gösterge Niteliğindeki Döviz Satış Kurları"));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                return Results.Problem(
+                    "Güncel kur bilgileri okunamadı.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        })
+        .WithName("GetLiveExchangeRates");
 
         group.MapPut("/exchange-rates/{currency}", async (
             string currency,
@@ -714,6 +762,56 @@ public static class FinanceEndpoints
         string fallback = "-")
     {
         return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    }
+
+    private static DateOnly GetTcmbEffectiveDate(XDocument document)
+    {
+        var rawDate =
+            document.Root?.Attribute("Date")?.Value ??
+            document.Root?.Attribute("Tarih")?.Value;
+
+        if (DateOnly.TryParseExact(
+                rawDate,
+                ["MM/dd/yyyy", "dd.MM.yyyy"],
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var effectiveDate))
+        {
+            return effectiveDate;
+        }
+
+        return DateOnly.FromDateTime(DateTime.UtcNow);
+    }
+
+    private static decimal GetTcmbSellingRate(XDocument document, string currency)
+    {
+        var currencyNode = document.Root?
+            .Elements("Currency")
+            .FirstOrDefault(node =>
+                string.Equals(
+                    node.Attribute("CurrencyCode")?.Value,
+                    currency,
+                    StringComparison.OrdinalIgnoreCase));
+
+        if (currencyNode is null)
+        {
+            throw new InvalidOperationException($"{currency} kuru TCMB yanıtında bulunamadı.");
+        }
+
+        var rateText =
+            currencyNode.Element("ForexSelling")?.Value ??
+            currencyNode.Element("BanknoteSelling")?.Value;
+
+        if (!decimal.TryParse(
+                rateText,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var rate) || rate <= 0)
+        {
+            throw new InvalidOperationException($"{currency} kuru TCMB yanıtından okunamadı.");
+        }
+
+        return rate;
     }
 
     private static string? NormalizeOptional(string? value)
