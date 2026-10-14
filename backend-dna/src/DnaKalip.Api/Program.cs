@@ -16,6 +16,24 @@ if (builder.Environment.IsDevelopment())
     builder.Logging.AddConsole();
 }
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ProductionCors", policy =>
+    {
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? ["https://app.example.com"];
+
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
+builder.Services.AddHealthChecks();
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -28,6 +46,7 @@ builder.Services
         Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")));
 builder.Services.AddScoped<ContractMilestoneSyncService>();
 builder.Services.AddScoped<PasswordHasher>();
+builder.Services.AddScoped<InitialAdminSeeder>();
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -35,6 +54,10 @@ builder.Services
         options.Cookie.Name = "dna_auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        options.Cookie.IsEssential = true;
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.Events.OnRedirectToLogin = context =>
@@ -66,6 +89,24 @@ if (builder.Environment.IsDevelopment())
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<DnaKalipDbContext>();
+    var applyMigrationsOnStartup = string.Equals(
+        app.Configuration["Database:ApplyMigrationsOnStartup"],
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+
+    if (applyMigrationsOnStartup)
+    {
+        await db.Database.MigrateAsync();
+    }
+
+    var initialAdminSeeder = scope.ServiceProvider.GetRequiredService<InitialAdminSeeder>();
+    await initialAdminSeeder.SeedAsync(CancellationToken.None);
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -93,16 +134,13 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
+    app.UseHsts();
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
 }
 
-app.MapGet("/health", () => Results.Ok(new
-{
-    status = "Healthy",
-    service = "DnaKalip.Api",
-    timestamp = DateTimeOffset.UtcNow,
-}))
-.WithName("GetHealth");
+app.UseCors("ProductionCors");
+app.MapHealthChecks("/health");
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -112,5 +150,30 @@ app.MapUsersEndpoints();
 app.MapContractsEndpoints();
 app.MapCompaniesEndpoints();
 app.MapFinanceEndpoints();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.MapFallback(async context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var indexPath = Path.Combine(
+            app.Environment.WebRootPath ?? string.Empty,
+            "index.html");
+
+        if (!File.Exists(indexPath))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(indexPath);
+    });
+}
 
 app.Run();

@@ -1,0 +1,15 @@
+.git
+.codex
+.agents
+.aws
+node_modules
+dist
+dist-ssr
+backend-dna/src/DnaKalip.Api/bin
+backend-dna/src/DnaKalip.Api/obj
+backend-dna/src/DnaKalip.Api/App_Data/DataProtectionKeys
+*.log
+*.local
+.env
+.env.*
+!.env.example

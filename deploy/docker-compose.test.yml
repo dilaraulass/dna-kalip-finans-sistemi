@@ -1,0 +1,37 @@
+name: dna-kalip-test
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    ports:
+      - "14333:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+
+  app:
+    build:
+      context: ..
+      dockerfile: backend-dna/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      Database__ApplyMigrationsOnStartup: "true"
+      ConnectionStrings__DefaultConnection: "Server=sql,1433;Database=DnaKalipDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=False;Connect Timeout=30;"
+      Auth__InitialAdmin__Enabled: "${INITIAL_ADMIN_ENABLED:-true}"
+      Auth__InitialAdmin__Email: "${INITIAL_ADMIN_EMAIL}"
+      Auth__InitialAdmin__Password: "${INITIAL_ADMIN_PASSWORD}"
+      Auth__InitialAdmin__FullName: "${INITIAL_ADMIN_FULL_NAME:-Sistem Admin}"
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_data:/app/App_Data
+    depends_on:
+      - sql
+
+volumes:
+  app_data:
+  sql_data:
