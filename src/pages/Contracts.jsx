@@ -11,6 +11,7 @@ import {
   restoreContract,
   updateContract,
 } from "../services/contractsApi";
+import { getCompanies } from "../services/companiesApi";
 import logo from "../assets/logo.png";
 import "./Contracts.css";
 
@@ -57,6 +58,7 @@ const INITIAL_CONTRACT_FORM = {
   revisionDate: "",
   publishDate: "2026-04-07",
   financeTab: "musteri",
+  companyId: "",
   companyName: "",
   contractDate: "",
   projectNumber: "",
@@ -168,7 +170,7 @@ const CONTRACT_EDITOR_CONFIG = {
   musteri: {
     tabLabel: "Müşteri Sözleşmesi",
     title: "KALIP İMALAT SATIŞ SÖZLEŞMESİ",
-    partyPlaceholder: "Müşteri seçin veya yazın...",
+    partyPlaceholder: "Müşteri seçiniz",
     dnaRole: "TEDARİKÇİ / SATICI",
     counterpartyRole: "MÜŞTERİ",
     subjectText:
@@ -477,6 +479,16 @@ function buildNextContractForm(currentForm, event) {
     [name]: nextValue,
   };
 
+  if (name === "companyId") {
+    const selectedCompanyName =
+      event.target.selectedOptions?.[0]?.dataset?.companyName || "";
+
+    return {
+      ...nextForm,
+      companyName: selectedCompanyName,
+    };
+  }
+
   if (name === "contractType") {
     return applyContractTypeDefaults(nextForm, value);
   }
@@ -488,6 +500,8 @@ function buildNextContractForm(currentForm, event) {
       {
         ...nextForm,
         contractType: validContractType,
+        companyId: "",
+        companyName: "",
       },
       validContractType,
     );
@@ -513,7 +527,11 @@ function buildContractFormFromDetail(contract) {
   const parsedFormData = parseContractFormData(contract.formDataJson);
 
   if (parsedFormData) {
-    return parsedFormData;
+    return {
+      ...parsedFormData,
+      companyId: parsedFormData.companyId || contract.company?.id || "",
+      companyName: parsedFormData.companyName || contract.company?.name || "",
+    };
   }
 
   return {
@@ -523,6 +541,7 @@ function buildContractFormFromDetail(contract) {
     contractType: contract.contractType || INITIAL_CONTRACT_FORM.contractType,
     contractNumberSuffix:
       contract.contractNumberSuffix || INITIAL_CONTRACT_FORM.contractNumberSuffix,
+    companyId: contract.company?.id || "",
     companyName: contract.company?.name || "",
     contractDate: contract.contractDate || "",
     projectNumber: contract.projectNumber || "",
@@ -655,6 +674,7 @@ function buildContractPayload(form) {
     financeTab: form.financeTab,
     contractType,
     contractNumberSuffix: contractSuffix,
+    companyId: form.companyId || null,
     companyName: form.companyName.trim(),
     contractDate: form.contractDate || null,
     projectNumber: form.projectNumber.trim() || null,
@@ -697,6 +717,7 @@ function ContractsPage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [archiveError, setArchiveError] = useState("");
   const [archiveSubmitting, setArchiveSubmitting] = useState(false);
+  const [companyOptions, setCompanyOptions] = useState([]);
 
   async function openContractDetail(contractId) {
     setSelectedContractId(contractId);
@@ -742,6 +763,29 @@ function ContractsPage() {
 
     return () => controller.abort();
   }, [contractArchiveStatus]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCompanyOptions() {
+      try {
+        const data = await getCompanies({
+          companyType: "all",
+          signal: controller.signal,
+        });
+
+        setCompanyOptions(data || []);
+      } catch (requestError) {
+        if (requestError.name !== "AbortError") {
+          setCompanyOptions([]);
+        }
+      }
+    }
+
+    loadCompanyOptions();
+
+    return () => controller.abort();
+  }, []);
 
   const filteredContracts = useMemo(() => {
     const search = searchText.trim().toLocaleLowerCase("tr-TR");
@@ -1259,6 +1303,7 @@ function ContractsPage() {
       >
         <CreateContractForm
           form={editForm}
+          companyOptions={companyOptions}
           error={editError}
           submitting={editSubmitting}
           onChange={handleEditFormChange}
@@ -1276,6 +1321,7 @@ function ContractsPage() {
       >
         <CreateContractForm
           form={createForm}
+          companyOptions={companyOptions}
           error={createError}
           submitting={createSubmitting}
           onChange={handleCreateFormChange}
@@ -1290,6 +1336,7 @@ function ContractsPage() {
 
 function CreateContractForm({
   form,
+  companyOptions = [],
   error,
   submitting,
   onChange,
@@ -1302,6 +1349,20 @@ function CreateContractForm({
   const contractTypeOptions = getContractTypeOptions(form.financeTab);
   const totalPages = form.financeTab === "tedarikci" ? 4 : 2;
   const [partImageError, setPartImageError] = useState("");
+  const filteredCompanyOptions = companyOptions.filter(
+    (company) => !company.companyType || company.companyType === form.financeTab,
+  );
+  const selectedCompanyExists = filteredCompanyOptions.some(
+    (company) => company.id === form.companyId,
+  );
+  const showCurrentCompanyFallback =
+    !!form.companyName && (!form.companyId || !selectedCompanyExists);
+  const companySelectValue =
+    form.companyId && selectedCompanyExists
+      ? form.companyId
+      : showCurrentCompanyFallback
+        ? "__current__"
+        : "";
 
   function changeContractType(financeTab) {
     if (readOnly) return;
@@ -1440,13 +1501,28 @@ function CreateContractForm({
                 İşbu sözleşme, bir tarafta <strong>DNA KALIP</strong> (bundan
                 böyle <strong>"{activeTemplate.dnaRole}"</strong> olarak
                 anılacaktır) ile diğer tarafta
-                <input
-                  name="companyName"
-                  value={form.companyName}
+                <select
+                  name="companyId"
+                  value={companySelectValue}
                   onChange={onChange}
-                  placeholder={activeTemplate.partyPlaceholder}
                   required
-                />
+                >
+                  <option value="">{activeTemplate.partyPlaceholder}</option>
+                  {showCurrentCompanyFallback && (
+                    <option value="__current__" data-company-name={form.companyName}>
+                      {form.companyName}
+                    </option>
+                  )}
+                  {filteredCompanyOptions.map((company) => (
+                    <option
+                      key={company.id}
+                      value={company.id}
+                      data-company-name={company.name}
+                    >
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
                 (bundan böyle <strong>"{activeTemplate.counterpartyRole}"</strong>{" "}
                 olarak anılacaktır) arasında akdedilmiştir.
               </p>

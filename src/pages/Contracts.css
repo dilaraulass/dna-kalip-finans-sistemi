@@ -538,7 +538,8 @@ button.contracts-summary-card:hover {
 }
 
 .contract-document-number input,
-.contract-document-section p input {
+.contract-document-section p input,
+.contract-document-section p select {
   width: 230px;
   border: 0;
   border-bottom: 2px solid #cbd5e1;
@@ -569,7 +570,8 @@ button.contracts-summary-card:hover {
   line-height: 1.55;
 }
 
-.contract-document-section p input {
+.contract-document-section p input,
+.contract-document-section p select {
   margin: 0 8px;
   font-size: 14px;
 }
@@ -1314,7 +1316,8 @@ button.contracts-summary-card:hover {
   }
 
   .contract-document-number input,
-  .contract-document-section p input {
+  .contract-document-section p input,
+  .contract-document-section p select {
     width: 100%;
   }
 
@@ -1392,6 +1395,7 @@ button.contracts-summary-card:hover {
   .contract-document-number input,
   .contract-document-number select,
   .contract-document-section p input,
+  .contract-document-section p select,
   .contract-document-info-grid input,
   .contract-document-amount-grid input,
   .contract-document-amount-grid select,
