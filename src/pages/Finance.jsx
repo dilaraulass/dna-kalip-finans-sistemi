@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiPrinter } from "react-icons/fi";
 import {
   buildFinancialAnalysis,
+  buildContractInvoiceArchiveRows,
   convertAmount,
   formatMoney,
 } from "../services/financeService";
@@ -337,36 +338,16 @@ function Finance() {
 
   const invoiceArchiveRows = useMemo(
     () => [
-      ...supplierRows
-        .filter((row) => row.invoiceIssued)
-        .map((row) => ({
-          archiveId: `supplier-${row.id}`,
-          sourceLabel: "Tedarikçi Ödemesi",
-          documentNumber: row.contractNumber,
-          company: row.company,
-          workOrder: row.workOrder,
-          invoiceNumber: row.invoiceNumber,
-          invoiceDate: row.paymentDate || row.approvalDate || row.contractDate,
-          originalAmount: row.amount,
-          convertedAmount: row.convertedAmount,
-          currency: row.currency,
-          status: row.status,
-        })),
-      ...customerRows
-        .filter((row) => row.invoiceIssued)
-        .map((row) => ({
-          archiveId: `customer-${row.id}`,
-          sourceLabel: "Müşteri Tahsilatı",
-          documentNumber: row.contractNumber,
-          company: row.company,
-          workOrder: row.workOrder,
-          invoiceNumber: row.invoiceNumber,
-          invoiceDate: row.paymentDate || row.approvalDate || row.contractDate,
-          originalAmount: row.amount,
-          convertedAmount: row.convertedAmount,
-          currency: row.currency,
-          status: row.status,
-        })),
+      ...buildContractInvoiceArchiveRows(
+        supplierRows,
+        "Tedarikçi Ödemesi",
+        "supplier",
+      ),
+      ...buildContractInvoiceArchiveRows(
+        customerRows,
+        "Müşteri Tahsilatı",
+        "customer",
+      ),
       ...expenseRows
         .filter((row) => row.invoiceIssued)
         .map((row) => ({
@@ -670,24 +651,35 @@ function Finance() {
     }
   }
 
-  async function handlePaymentInvoiceInlineUpdate(row, invoiceFields) {
-    if (invoiceFields.invoiceIssued && !invoiceFields.invoiceNumber.trim()) {
+  async function handlePaymentInlineUpdate(row, changes) {
+    const invoiceFieldsChanged =
+      Object.hasOwn(changes, "invoiceIssued") ||
+      Object.hasOwn(changes, "invoiceNumber");
+    const invoiceIssued = changes.invoiceIssued ?? Boolean(row.invoiceIssued);
+    const invoiceNumber = invoiceIssued
+      ? String(changes.invoiceNumber ?? row.invoiceNumber ?? "").trim()
+      : "";
+
+    if (invoiceFieldsChanged && invoiceIssued && !invoiceNumber) {
       setInlineUpdateError("Fatura kesildiyse fatura no zorunludur.");
       return;
     }
 
+    const activeDueDays = changes.activeDueDays ?? row.activeDueDays;
     const dueDaysOverride =
-      row.activeDueDays === row.defaultDueDays ? null : row.activeDueDays;
+      activeDueDays === row.defaultDueDays ? null : activeDueDays;
 
     const payload = {
-      approvalDate: row.approvalDate || null,
-      paymentDate: row.paymentDate || null,
-      status: row.paymentStatus,
+      approvalDate: (changes.approvalDate ?? row.approvalDate) || null,
+      paymentDate: (changes.paymentDate ?? row.paymentDate) || null,
+      status: changes.paymentStatus ?? row.paymentStatus,
       dueDaysOverride,
-      invoiceIssued: invoiceFields.invoiceIssued,
-      invoiceNumber: invoiceFields.invoiceIssued
-        ? invoiceFields.invoiceNumber.trim()
-        : null,
+      ...(invoiceFieldsChanged
+        ? {
+            invoiceIssued,
+            invoiceNumber: invoiceIssued ? invoiceNumber : null,
+          }
+        : {}),
     };
 
     try {
@@ -699,19 +691,26 @@ function Finance() {
         currentRow?.id === row.id
           ? {
               ...currentRow,
-              invoiceIssued: invoiceFields.invoiceIssued,
-              invoiceNumber: invoiceFields.invoiceIssued
-                ? invoiceFields.invoiceNumber.trim()
-                : "",
+              ...changes,
+              activeDueDays,
+              approvalDate: changes.approvalDate ?? row.approvalDate,
+              paymentDate: changes.paymentDate ?? row.paymentDate,
+              paymentStatus: changes.paymentStatus ?? row.paymentStatus,
+              invoiceIssued,
+              invoiceNumber,
             }
           : currentRow,
       );
     } catch (requestError) {
       const message =
-        requestError.message || "Fatura bilgileri güncellenemedi.";
+        requestError.message || "Ödeme bilgileri güncellenemedi.";
       setInlineUpdateError(message);
       throw requestError;
     }
+  }
+
+  async function handlePaymentInvoiceInlineUpdate(row, invoiceFields) {
+    return handlePaymentInlineUpdate(row, invoiceFields);
   }
 
   async function handleExpenseInvoiceInlineUpdate(row, invoiceFields) {
@@ -999,6 +998,7 @@ function Finance() {
               }}
               setSelectedRowId={setSelectedRowId}
               onExportExcel={handlePaymentExcelExport}
+              onPaymentInlineUpdate={handlePaymentInlineUpdate}
               onInvoiceInlineUpdate={handlePaymentInvoiceInlineUpdate}
               onInvoiceInlineValidationError={handleInvoiceInlineValidationError}
             />

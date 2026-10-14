@@ -284,6 +284,64 @@ export function buildFinanceMilestones(contracts, mode) {
   });
 }
 
+export function buildContractInvoiceArchiveRows(rows, sourceLabel, sourceKey) {
+  const invoicesByContract = new Map();
+
+  rows.forEach((row) => {
+    if (!row.invoiceIssued) return;
+
+    const contractKey = row.contractId || row.contractNumber;
+    let invoice = invoicesByContract.get(contractKey);
+
+    if (!invoice) {
+      invoice = {
+        archiveId: `${sourceKey}-${contractKey}`,
+        sourceLabel,
+        documentNumber: row.contractNumber,
+        company: row.company,
+        workOrder: row.workOrder,
+        invoiceNumber: row.invoiceNumber,
+        invoiceDate: "",
+        originalAmount: row.contractAmount,
+        convertedAmount: row.convertedContractAmount,
+        currency: row.contractCurrency,
+        allMilestonesPaid: true,
+        hasOverdueMilestone: false,
+        hasApproachingMilestone: false,
+      };
+      invoicesByContract.set(contractKey, invoice);
+    }
+
+    invoice.invoiceDate ||= row.paymentDate || row.approvalDate || row.contractDate || "";
+    invoice.allMilestonesPaid &&= row.statusKey === "paid";
+    invoice.hasOverdueMilestone ||= row.statusKey === "overdue";
+    invoice.hasApproachingMilestone ||= row.statusKey === "approaching";
+  });
+
+  return [...invoicesByContract.values()].map((invoice) => {
+    const status = invoice.allMilestonesPaid
+      ? "Ödenen"
+      : invoice.hasOverdueMilestone
+        ? "Geciken"
+        : invoice.hasApproachingMilestone
+          ? "Yaklaşan"
+          : "Bekleyen";
+    return {
+      archiveId: invoice.archiveId,
+      sourceLabel: invoice.sourceLabel,
+      documentNumber: invoice.documentNumber,
+      company: invoice.company,
+      workOrder: invoice.workOrder,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      originalAmount: invoice.originalAmount,
+      convertedAmount: invoice.convertedAmount,
+      currency: invoice.currency,
+      status,
+    };
+  });
+}
+
 export function buildExpenseInvoices(expenses) {
   return expenses.map((invoice) => {
     const invoiceDate = invoice.date || "";

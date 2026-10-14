@@ -42,6 +42,7 @@ public sealed record FinancePaymentMilestoneResponse(
     string PaymentStatus,
     bool InvoiceIssued,
     string InvoiceNumber,
+    bool InvoiceDataConflict,
     string StatusKey,
     string Status,
     int? DaysUntilDue,

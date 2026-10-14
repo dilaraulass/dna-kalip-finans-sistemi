@@ -5,7 +5,7 @@ public sealed record UpdatePaymentTrackingRequest(
     DateOnly? PaymentDate,
     string Status,
     int? DueDaysOverride,
-    bool InvoiceIssued,
+    bool? InvoiceIssued,
     string? InvoiceNumber);
 
 public sealed record UpsertExchangeRateRequest(

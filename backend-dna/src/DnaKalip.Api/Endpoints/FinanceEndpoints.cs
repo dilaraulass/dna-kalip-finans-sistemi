@@ -54,6 +54,9 @@ public static class FinanceEndpoints
                     ContractCurrency = milestone.Contract.Currency,
                     ExchangeRateType = milestone.Contract.ExchangeRateType,
                     FixedExchangeRate = milestone.Contract.FixedExchangeRate,
+                    InvoiceIssued = milestone.Contract.InvoiceIssued,
+                    InvoiceNumber = milestone.Contract.InvoiceNumber,
+                    InvoiceDataConflict = milestone.Contract.InvoiceDataConflict,
                     PaymentTracking = milestone.PaymentTracking == null
                         ? null
                         : new
@@ -62,8 +65,6 @@ public static class FinanceEndpoints
                             milestone.PaymentTracking.PaymentDate,
                             milestone.PaymentTracking.Status,
                             milestone.PaymentTracking.DueDaysOverride,
-                            milestone.PaymentTracking.InvoiceIssued,
-                            milestone.PaymentTracking.InvoiceNumber,
                         },
                 })
                 .ToListAsync(cancellationToken);
@@ -106,8 +107,9 @@ public static class FinanceEndpoints
                         milestone.PaymentTracking?.ApprovalDate,
                         milestone.PaymentTracking?.PaymentDate,
                         paymentStatus,
-                        milestone.PaymentTracking?.InvoiceIssued ?? false,
-                        milestone.PaymentTracking?.InvoiceNumber ?? string.Empty,
+                        milestone.InvoiceIssued,
+                        milestone.InvoiceNumber ?? string.Empty,
+                        milestone.InvoiceDataConflict,
                         status.StatusKey,
                         status.Status,
                         status.DaysUntilDue,
@@ -187,8 +189,8 @@ public static class FinanceEndpoints
                 .ToDictionary(
                     group => group.Key,
                     group => group
-                        .OrderByDescending(rate => rate.EffectiveDate)
-                        .ThenByDescending(rate => rate.CreatedAt)
+                        .OrderByDescending(rate => rate.CreatedAt)
+                        .ThenByDescending(rate => rate.EffectiveDate)
                         .First()
                         .RateToTry);
 
@@ -214,8 +216,8 @@ public static class FinanceEndpoints
                 .ToDictionary(
                     group => group.Key,
                     group => group
-                        .OrderByDescending(rate => rate.EffectiveDate)
-                        .ThenByDescending(rate => rate.CreatedAt)
+                        .OrderByDescending(rate => rate.CreatedAt)
+                        .ThenByDescending(rate => rate.EffectiveDate)
                         .First());
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -327,6 +329,7 @@ public static class FinanceEndpoints
             }
 
             exchangeRate.RateToTry = request.RateToTry;
+            exchangeRate.CreatedAt = DateTimeOffset.UtcNow;
 
             await db.SaveChangesAsync(cancellationToken);
 
@@ -351,12 +354,13 @@ public static class FinanceEndpoints
                 return Results.ValidationProblem(validationErrors);
             }
 
-            var milestoneExists = await db.ContractMilestones
-                .AnyAsync(
+            var milestone = await db.ContractMilestones
+                .Include(item => item.Contract)
+                .FirstOrDefaultAsync(
                     item => item.Id == milestoneId,
                     cancellationToken);
 
-            if (!milestoneExists)
+            if (milestone is null)
             {
                 return Results.NotFound();
             }
@@ -380,10 +384,14 @@ public static class FinanceEndpoints
             paymentTracking.PaymentDate = request.PaymentDate;
             paymentTracking.Status = request.Status.Trim().ToLowerInvariant();
             paymentTracking.DueDaysOverride = request.DueDaysOverride;
-            paymentTracking.InvoiceIssued = request.InvoiceIssued;
-            paymentTracking.InvoiceNumber = request.InvoiceIssued
-                ? NormalizeOptional(request.InvoiceNumber)
-                : null;
+            if (request.InvoiceIssued.HasValue)
+            {
+                milestone.Contract.InvoiceIssued = request.InvoiceIssued.Value;
+                milestone.Contract.InvoiceNumber = request.InvoiceIssued.Value
+                    ? NormalizeOptional(request.InvoiceNumber)
+                    : null;
+                milestone.Contract.InvoiceDataConflict = false;
+            }
 
             await db.SaveChangesAsync(cancellationToken);
 
@@ -567,10 +575,13 @@ public static class FinanceEndpoints
             errors["dueDaysOverride"] = ["Vade negatif olamaz."];
         }
 
-        AddInvoiceValidationErrors(
-            errors,
-            request.InvoiceIssued,
-            request.InvoiceNumber);
+        if (request.InvoiceIssued.HasValue)
+        {
+            AddInvoiceValidationErrors(
+                errors,
+                request.InvoiceIssued.Value,
+                request.InvoiceNumber);
+        }
 
         return errors;
     }

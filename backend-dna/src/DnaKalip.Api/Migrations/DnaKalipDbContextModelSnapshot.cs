@@ -218,6 +218,20 @@ namespace DnaKalip.Api.Migrations
                     b.Property<string>("FormDataJson")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("InvoiceDataConflict")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("InvoiceIssued")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<bool>("IsArchived")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")

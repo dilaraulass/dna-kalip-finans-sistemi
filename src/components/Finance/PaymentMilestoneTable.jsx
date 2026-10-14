@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ALL_FILTER_VALUE,
   CURRENCY_OPTIONS,
   FINANCE_MODULES,
+  PAYMENT_STATUS_OPTIONS,
 } from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 import StatusBadge from "../ui/StatusBadge";
@@ -27,15 +28,20 @@ function PaymentMilestoneTable({
   setSelectedRow,
   setSelectedRowId,
   onExportExcel,
+  onPaymentInlineUpdate,
   onInvoiceInlineUpdate,
   onInvoiceInlineValidationError,
 }) {
   const [invoiceDrafts, setInvoiceDrafts] = useState({});
-  const [savingInvoiceIds, setSavingInvoiceIds] = useState({});
+  const [savingRowIds, setSavingRowIds] = useState({});
+  const [editingCell, setEditingCell] = useState(null);
+  const cancelledEditRef = useRef("");
 
   function getInvoiceDraft(row) {
+    const draftKey = row.contractId || row.contractNumber;
+
     return (
-      invoiceDrafts[row.id] || {
+      invoiceDrafts[draftKey] || {
         invoiceIssued: Boolean(row.invoiceIssued),
         invoiceNumber: row.invoiceNumber || "",
       }
@@ -45,7 +51,7 @@ function PaymentMilestoneTable({
   function setInvoiceDraft(row, draft) {
     setInvoiceDrafts((currentDrafts) => ({
       ...currentDrafts,
-      [row.id]: draft,
+      [row.contractId || row.contractNumber]: draft,
     }));
   }
 
@@ -60,19 +66,61 @@ function PaymentMilestoneTable({
       return;
     }
 
-    setSavingInvoiceIds((currentIds) => ({ ...currentIds, [row.id]: true }));
+    const draftKey = row.contractId || row.contractNumber;
+    setSavingRowIds((currentIds) => ({ ...currentIds, [draftKey]: true }));
 
     try {
       await onInvoiceInlineUpdate?.(row, normalizedDraft);
       setInvoiceDrafts((currentDrafts) => {
         const nextDrafts = { ...currentDrafts };
-        delete nextDrafts[row.id];
+        delete nextDrafts[draftKey];
         return nextDrafts;
       });
     } catch {
       // Hata mesajı parent bileşende gösteriliyor; draft korunur.
     } finally {
-      setSavingInvoiceIds((currentIds) => {
+      setSavingRowIds((currentIds) => {
+        const nextIds = { ...currentIds };
+        delete nextIds[draftKey];
+        return nextIds;
+      });
+    }
+  }
+
+  async function commitPaymentDraft(row, field, value) {
+    const changes =
+      field === "activeDueDays"
+        ? { activeDueDays: Number(value) }
+        : field === "paymentStatus"
+          ? { paymentStatus: value }
+          : { [field]: value || null };
+
+    if (
+      field === "activeDueDays" &&
+      (!Number.isInteger(changes.activeDueDays) || changes.activeDueDays < 0)
+    ) {
+      onInvoiceInlineValidationError?.("Vade sıfır veya daha büyük bir tam sayı olmalıdır.");
+      return;
+    }
+
+    const currentValue =
+      field === "activeDueDays"
+        ? row.activeDueDays
+        : field === "paymentStatus"
+          ? row.paymentStatus
+          : row[field] || "";
+    const nextValue = field === "activeDueDays" ? changes.activeDueDays : value || "";
+
+    if (currentValue === nextValue) return;
+
+    setSavingRowIds((currentIds) => ({ ...currentIds, [row.id]: true }));
+
+    try {
+      await onPaymentInlineUpdate?.(row, changes);
+    } catch {
+      // Parent bileşen hata mesajını gösterir; sunucu hatasında satırdaki eski değer korunur.
+    } finally {
+      setSavingRowIds((currentIds) => {
         const nextIds = { ...currentIds };
         delete nextIds[row.id];
         return nextIds;
@@ -82,6 +130,110 @@ function PaymentMilestoneTable({
 
   function stopGridEvent(event) {
     event.stopPropagation();
+  }
+
+  function renderEditableCell(row, field, label, displayValue, editorType) {
+    const isEditable = activeTab === FINANCE_MODULES.supplier;
+    const isEditing =
+      editingCell?.rowId === row.id && editingCell?.field === field;
+    const isSaving = Boolean(savingRowIds[row.id]);
+
+    if (!isEditable) return displayValue;
+
+    if (isEditing) {
+      const inputProps = {
+        autoFocus: true,
+        className: "finance-inline-input finance-editable-input",
+        disabled: isSaving,
+        "aria-label": `${label} düzenle`,
+        onClick: stopGridEvent,
+        onKeyDown: (event) => {
+          event.stopPropagation();
+
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            cancelledEditRef.current = `${row.id}:${field}`;
+            setEditingCell(null);
+          }
+        },
+        onBlur: (event) => {
+          const editKey = `${row.id}:${field}`;
+          if (cancelledEditRef.current === editKey) {
+            cancelledEditRef.current = "";
+            return;
+          }
+
+          setEditingCell(null);
+          commitPaymentDraft(row, field, event.currentTarget.value);
+        },
+      };
+
+      if (editorType === "status") {
+        return (
+          <select
+            {...inputProps}
+            value={editingCell.value}
+            onChange={(event) =>
+              setEditingCell((current) =>
+                current ? { ...current, value: event.target.value } : current,
+              )
+            }
+          >
+            {PAYMENT_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
+      }
+
+      return (
+        <input
+          {...inputProps}
+          type={editorType}
+          min={editorType === "number" ? 0 : undefined}
+          step={editorType === "number" ? 1 : undefined}
+          value={editingCell.value}
+          onChange={(event) =>
+            setEditingCell((current) =>
+              current ? { ...current, value: event.target.value } : current,
+            )
+          }
+        />
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className="finance-editable-cell"
+        aria-label={`${label}: ${typeof displayValue === "string" || typeof displayValue === "number" ? displayValue : row.status}. Düzenlemek için tıklayın`}
+        title={`${label} düzenle`}
+        disabled={isSaving}
+        onClick={(event) => {
+          stopGridEvent(event);
+          const value =
+            field === "activeDueDays"
+              ? String(row.activeDueDays ?? "")
+              : field === "paymentStatus"
+                ? row.paymentStatus
+                : row[field] || "";
+          setEditingCell({ rowId: row.id, field, value });
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.currentTarget.click();
+          }
+        }}
+      >
+        {displayValue}
+      </button>
+    );
   }
 
   const groupedRows = useMemo(() => {
@@ -116,7 +268,7 @@ function PaymentMilestoneTable({
 
   function renderInvoiceIssuedCell(row) {
     const draft = getInvoiceDraft(row);
-    const isSaving = Boolean(savingInvoiceIds[row.id]);
+    const isSaving = Boolean(savingRowIds[row.contractId || row.contractNumber]);
 
     return (
       <input
@@ -143,32 +295,44 @@ function PaymentMilestoneTable({
 
   function renderInvoiceNumberCell(row) {
     const draft = getInvoiceDraft(row);
-    const isSaving = Boolean(savingInvoiceIds[row.id]);
+    const isSaving = Boolean(savingRowIds[row.contractId || row.contractNumber]);
 
     return (
-      <input
-        type="text"
-        className="finance-inline-input"
-        value={draft.invoiceNumber}
-        disabled={!draft.invoiceIssued || isSaving}
-        placeholder={draft.invoiceIssued ? "Fatura no" : "-"}
-        onClick={stopGridEvent}
-        onDoubleClick={stopGridEvent}
-        onChange={(event) =>
-          setInvoiceDraft(row, {
-            ...draft,
-            invoiceNumber: event.target.value,
-          })
-        }
-        onBlur={() => commitInvoiceDraft(row, draft)}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-
-          if (event.key === "Enter") {
-            event.currentTarget.blur();
+      <div className="finance-contract-invoice-cell">
+        <input
+          type="text"
+          className="finance-inline-input"
+          value={draft.invoiceNumber}
+          disabled={!draft.invoiceIssued || isSaving}
+          placeholder={draft.invoiceIssued ? "Fatura no" : "-"}
+          aria-label={`${row.contractNumber} fatura numarası`}
+          onClick={stopGridEvent}
+          onDoubleClick={stopGridEvent}
+          onChange={(event) =>
+            setInvoiceDraft(row, {
+              ...draft,
+              invoiceNumber: event.target.value,
+            })
           }
-        }}
-      />
+          onBlur={() => commitInvoiceDraft(row, draft)}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+            }
+          }}
+        />
+        {row.invoiceDataConflict && (
+          <span
+            className="finance-invoice-conflict"
+            role="status"
+            title="Eski hakediş kayıtlarında birden fazla fatura bilgisi vardı. Eski değerler korundu; bu sözleşme için doğru fatura bilgisini girerek çakışmayı çözün."
+          >
+            Eski fatura verileri çelişkili
+          </span>
+        )}
+      </div>
     );
   }
 
@@ -347,22 +511,61 @@ function PaymentMilestoneTable({
                       <strong>{row.milestoneCondition}</strong>
                       {row.subMilestone && <span>• {row.subMilestone}</span>}
                     </td>
-                    <td className="finance-center-cell">{row.activeDueDays}</td>
-                    <td className="finance-center-cell">{row.approvalDate || "-"}</td>
-                    <td className="finance-center-cell">{row.paymentDate || "-"}</td>
                     <td className="finance-center-cell">
-                      {renderInvoiceIssuedCell(row)}
+                      {renderEditableCell(
+                        row,
+                        "activeDueDays",
+                        "Vade",
+                        row.activeDueDays,
+                        "number",
+                      )}
                     </td>
-                    <td>{renderInvoiceNumberCell(row)}</td>
+                    <td className="finance-center-cell">
+                      {renderEditableCell(
+                        row,
+                        "approvalDate",
+                        "Onay tarihi",
+                        row.approvalDate || "-",
+                        "date",
+                      )}
+                    </td>
+                    <td className="finance-center-cell">
+                      {renderEditableCell(
+                        row,
+                        "paymentDate",
+                        "Ödeme tarihi",
+                        row.paymentDate || "-",
+                        "date",
+                      )}
+                    </td>
+                    {rowIndex === 0 && (
+                      <>
+                        <td
+                          rowSpan={group.items.length}
+                          className="finance-center-cell"
+                        >
+                          {renderInvoiceIssuedCell(row)}
+                        </td>
+                        <td rowSpan={group.items.length}>
+                          {renderInvoiceNumberCell(row)}
+                        </td>
+                      </>
+                    )}
                     <td className="finance-amount-cell">
                       {formatMoney(row.convertedAmount, displayCurrency)}
                     </td>
                     <td className="finance-center-cell">
-                      <StatusBadge
-                        statusKey={row.statusKey}
-                        status={row.status}
-                        daysUntilDue={row.daysUntilDue}
-                      />
+                      {renderEditableCell(
+                        row,
+                        "paymentStatus",
+                        "Ödeme durumu",
+                        <StatusBadge
+                          statusKey={row.statusKey}
+                          status={row.status}
+                          daysUntilDue={row.daysUntilDue}
+                        />,
+                        "status",
+                      )}
                     </td>
                   </tr>
                 );

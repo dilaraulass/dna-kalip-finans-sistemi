@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildContractInvoiceArchiveRows,
   buildExpenseInvoices,
   buildFinancialAnalysis,
   buildFinanceMilestones,
@@ -89,6 +90,73 @@ test("supplier first milestone is split by mold count", () => {
     [250, 350, 400],
   );
   assert.equal(milestones[1].approvalDate, "2026-02-01");
+});
+
+test("contract invoice archive has one row per contract", () => {
+  const archiveRows = buildContractInvoiceArchiveRows(
+    [
+      {
+        id: "a-1",
+        contractId: "contract-a",
+        contractNumber: "A-001",
+        company: "Firma A",
+        workOrder: "26001",
+        invoiceIssued: true,
+        invoiceNumber: "INV-1",
+        contractAmount: 500,
+        convertedContractAmount: 500,
+        contractCurrency: "EUR",
+        paymentDate: "",
+        approvalDate: "2026-01-10",
+        contractDate: "2026-01-01",
+        statusKey: "paid",
+      },
+      {
+        id: "a-2",
+        contractId: "contract-a",
+        contractNumber: "A-001",
+        company: "Firma A",
+        workOrder: "26001",
+        invoiceIssued: true,
+        invoiceNumber: "INV-1",
+        contractAmount: 500,
+        convertedContractAmount: 500,
+        contractCurrency: "EUR",
+        paymentDate: "2026-02-10",
+        approvalDate: "2026-01-20",
+        contractDate: "2026-01-01",
+        statusKey: "overdue",
+      },
+      {
+        id: "b-1",
+        contractId: "contract-b",
+        contractNumber: "B-001",
+        company: "Firma B",
+        workOrder: "26002",
+        invoiceIssued: true,
+        invoiceNumber: "INV-2",
+        contractAmount: 800,
+        convertedContractAmount: 800,
+        contractCurrency: "EUR",
+        statusKey: "pending",
+      },
+      {
+        id: "c-1",
+        contractId: "contract-c",
+        contractNumber: "C-001",
+        invoiceIssued: false,
+      },
+    ],
+    "Tedarikçi Ödemesi",
+    "supplier",
+  );
+
+  assert.equal(archiveRows.length, 2);
+  assert.equal(archiveRows[0].archiveId, "supplier-contract-a");
+  assert.equal(archiveRows[0].invoiceNumber, "INV-1");
+  assert.equal(archiveRows[0].originalAmount, 500);
+  assert.equal(archiveRows[0].status, "Geciken");
+  assert.equal(archiveRows[1].archiveId, "supplier-contract-b");
 });
 
 test("contracts are separated by finance tab", () => {
