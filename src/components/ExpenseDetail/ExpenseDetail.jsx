@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createCompany } from "../../services/companiesApi";
+import { getExpenseTypes, getCompanyExpenseDefaults } from "../../services/financeApi";
 import { formatDate } from "../../services/tableDisplay";
 import {
   CURRENCIES,
@@ -15,6 +17,7 @@ function getInitialForm(selectedRow) {
     workOrderNumber:
       selectedRow?.workOrder === "GENEL" ? "" : selectedRow?.workOrder || "",
     invoiceType: selectedRow?.invoiceType || "",
+    expenseTypeId: String(selectedRow?.expenseTypeId || ""),
     description: selectedRow?.company || "",
     amount: String(selectedRow?.amount ?? ""),
     currency: selectedRow?.currency || CURRENCIES.try,
@@ -35,11 +38,75 @@ function ExpenseDetail({
   archiving = false,
   mode = "edit",
   companyOptions = [],
+  onCompanyCreated,
   onSave,
   onArchive,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
   const isCreateMode = mode === "create";
+  const [expenseTypes, setExpenseTypes] = useState([]);
+  const [typesLoading, setTypesLoading] = useState(true);
+  const [typesError, setTypesError] = useState("");
+  const [typesAttempt, setTypesAttempt] = useState(0);
+  const [defaultsLoading, setDefaultsLoading] = useState(false);
+  const [defaultsMessage, setDefaultsMessage] = useState("");
+  const defaultsRequest = useRef(null);
+  const [showCompanyForm, setShowCompanyForm] = useState(false);
+  const [companySaving, setCompanySaving] = useState(false);
+  const [companyError, setCompanyError] = useState("");
+  const [newCompany, setNewCompany] = useState({ name: "", companyType: "tedarikci", taxNumber: "", email: "", phone: "" });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getExpenseTypes({ signal: controller.signal })
+      .then(setExpenseTypes)
+      .catch((error) => { if (!controller.signal.aborted) setTypesError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setTypesLoading(false); });
+    return () => controller.abort();
+  }, [typesAttempt]);
+
+  useEffect(() => () => defaultsRequest.current?.abort(), []);
+
+  async function selectCompany(companyId) {
+    defaultsRequest.current?.abort();
+    const controller = new AbortController();
+    defaultsRequest.current = controller;
+    setForm((current) => ({ ...current, companyId, dueDays: "", expenseTypeId: "" }));
+    setDefaultsMessage("");
+    setDefaultsLoading(Boolean(companyId));
+    if (!companyId) return;
+    try {
+      const defaults = await getCompanyExpenseDefaults(companyId, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (defaults) {
+        setForm((current) => ({ ...current, dueDays: String(defaults.dueDays), expenseTypeId: String(defaults.expenseTypeId || "") }));
+        setDefaultsMessage("Vade ve gider türü son ek gider faturasından alındı. Değiştirebilirsiniz.");
+      } else {
+        setDefaultsMessage("Bu firmanın önceki faturası yok. Vade ve gider türünü girin.");
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) setDefaultsMessage(`Önceki bilgiler alınamadı: ${error.message}. Alanları elle doldurabilirsiniz.`);
+    } finally {
+      if (!controller.signal.aborted) setDefaultsLoading(false);
+    }
+  }
+
+  async function handleCompanyCreate(event) {
+    event.preventDefault();
+    setCompanySaving(true);
+    setCompanyError("");
+    try {
+      const company = await createCompany(newCompany);
+      onCompanyCreated?.(company);
+      setShowCompanyForm(false);
+      setNewCompany({ name: "", companyType: "tedarikci", taxNumber: "", email: "", phone: "" });
+      await selectCompany(company.id);
+    } catch (error) {
+      setCompanyError(error.message);
+    } finally {
+      setCompanySaving(false);
+    }
+  }
 
   if (!selectedRow) return null;
 
@@ -50,6 +117,15 @@ function ExpenseDetail({
   function handleChange(event) {
     const { checked, name, type, value } = event.target;
 
+    if (name === "companyId") {
+      if (value === "__new") {
+        setShowCompanyForm(true);
+      } else {
+        selectCompany(value);
+      }
+      return;
+    }
+
     setForm((currentForm) => ({
       ...currentForm,
       [name]: type === "checkbox" ? checked : value,
@@ -59,11 +135,13 @@ function ExpenseDetail({
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (saving || archiving || defaultsLoading || typesLoading || typesError || showCompanyForm || companySaving) return;
 
     onSave?.({
       companyId: form.companyId,
       workOrderNumber: form.workOrderNumber || null,
       invoiceType: form.invoiceType || null,
+      expenseTypeId: Number(form.expenseTypeId),
       description: selectedCompany?.name || form.description,
       amount: Number.parseFloat(form.amount || "0"),
       currency: form.currency,
@@ -171,16 +249,50 @@ function ExpenseDetail({
         </>
       )}
 
+      {showCompanyForm && (
+        <form className="finance-detail-section" onSubmit={handleCompanyCreate}>
+          <h3>Yeni Firma</h3>
+          <p>Firma ayrıca kaydedilir; fatura bilgilerinizi kaybetmeden devam edebilirsiniz.</p>
+          {companyError && <div className="finance-detail-error" role="alert">{companyError}</div>}
+          <div className="finance-detail-form-grid">
+            {[
+              ["name", "Firma Adı", "text", 250], ["taxNumber", "Vergi No", "text", 50],
+              ["email", "E-posta", "email", 250], ["phone", "Telefon", "tel", 50],
+            ].map(([field, label, type, maxLength]) => (
+              <label key={field}><span>{label}</span><input type={type} maxLength={maxLength}
+                required={field === "name"} value={newCompany[field]} disabled={companySaving}
+                onChange={(event) => setNewCompany((current) => ({ ...current, [field]: event.target.value }))} /></label>
+            ))}
+            <label><span>Firma Türü</span><select value={newCompany.companyType} disabled={companySaving}
+              onChange={(event) => setNewCompany((current) => ({ ...current, companyType: event.target.value }))}>
+              <option value="tedarikci">Tedarikçi</option><option value="musteri">Müşteri</option>
+            </select></label>
+          </div>
+          <div className="finance-detail-actions">
+            <button className="detail-btn primary" disabled={companySaving}>{companySaving ? "Kaydediliyor..." : "Firmayı Kaydet ve Seç"}</button>
+            <button type="button" className="detail-btn secondary" disabled={companySaving} onClick={() => setShowCompanyForm(false)}>Vazgeç</button>
+          </div>
+        </form>
+      )}
+
       <form className="finance-detail-section" onSubmit={handleSubmit}>
         <h3>{isCreateMode ? "Yeni Fatura Bilgisi" : "Fatura Bilgilerini Güncelle"}</h3>
 
         {error && <div className="finance-detail-error">{error}</div>}
+        {typesError && <div className="finance-detail-error" role="alert">
+          Gider türleri yüklenemedi: {typesError}
+          <button type="button" className="detail-btn secondary" onClick={() => {
+            setTypesError(""); setTypesLoading(true); setTypesAttempt((current) => current + 1);
+          }}>Tekrar Dene</button>
+        </div>}
+        <p role="status">{defaultsLoading ? "Firmanın önceki fatura bilgileri alınıyor..." : defaultsMessage}</p>
 
         <div className="finance-detail-form-grid">
           <label>
             <span>Firma</span>
             <select
               name="companyId"
+              disabled={saving || companySaving || showCompanyForm}
               value={form.companyId}
               onChange={handleChange}
               required
@@ -195,6 +307,7 @@ function ExpenseDetail({
                   {company.name}
                 </option>
               ))}
+              <option value="__new">+ Yeni Firma Ekle</option>
             </select>
           </label>
 
@@ -210,12 +323,16 @@ function ExpenseDetail({
 
           <label>
             <span>Gider Türü</span>
-            <input
-              type="text"
-              name="invoiceType"
-              value={form.invoiceType}
+            <select
+              name="expenseTypeId"
+              value={form.expenseTypeId}
               onChange={handleChange}
-            />
+              disabled={typesLoading || defaultsLoading}
+              required
+            >
+              <option value="">{typesLoading ? "Yükleniyor..." : "Gider türü seçin"}</option>
+              {expenseTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </select>
           </label>
 
           <label>
@@ -258,6 +375,7 @@ function ExpenseDetail({
             <input
               type="number"
               name="dueDays"
+              disabled={defaultsLoading}
               min="0"
               value={form.dueDays}
               onChange={handleChange}
@@ -312,7 +430,7 @@ function ExpenseDetail({
           <button
             type="submit"
             className="detail-btn primary"
-            disabled={saving || archiving}
+            disabled={saving || archiving || defaultsLoading || typesLoading || !!typesError || showCompanyForm || companySaving}
           >
             {saving ? "Kaydediliyor..." : isCreateMode ? "Fatura Ekle" : "Kaydet"}
           </button>

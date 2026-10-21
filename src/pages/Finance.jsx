@@ -733,6 +733,7 @@ function Finance() {
       invoiceIssued: invoiceFields.invoiceIssued,
       invoiceNumber: invoiceFields.invoiceIssued
         ? invoiceFields.invoiceNumber.trim()
+      expenseTypeId: row.expenseTypeId || null,
         : null,
     };
 
@@ -1109,6 +1110,9 @@ function Finance() {
             onPreviewContract={handlePreviewContract}
           />
         )}
+            onCompanyCreated={(company) => setCompanyOptions((current) =>
+              [...current.filter((item) => item.id !== company.id), company]
+                .sort((a, b) => a.name.localeCompare(b.name, "tr")))}
       </Drawer>
 
       <Drawer

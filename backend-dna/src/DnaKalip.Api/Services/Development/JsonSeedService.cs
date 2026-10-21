@@ -56,6 +56,8 @@ public sealed class JsonSeedService(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var counters = new SeedCounters();
+        var expenseTypes = await dbContext.ExpenseTypes
+            .ToDictionaryAsync(type => type.Name, StringComparer.OrdinalIgnoreCase, cancellationToken);
         var effectiveDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
         foreach (var item in document.RootElement.EnumerateArray())
@@ -64,7 +66,7 @@ public sealed class JsonSeedService(
 
             if (id == "SYSTEM_EXPENSES_DB")
             {
-                SeedExpenseInvoices(item, invoiceKeys, counters);
+                SeedExpenseInvoices(item, invoiceKeys, expenseTypes, counters);
                 continue;
             }
 
@@ -498,6 +500,7 @@ public sealed class JsonSeedService(
     private void SeedExpenseInvoices(
         JsonElement item,
         HashSet<string> invoiceKeys,
+        Dictionary<string, ExpenseType> expenseTypes,
         SeedCounters counters)
     {
         var invoices = GetArray(item, "faturalar");
@@ -524,8 +527,17 @@ public sealed class JsonSeedService(
                 continue;
             }
 
+            var typeName = string.IsNullOrWhiteSpace(invoiceType) ? "Diğer" : invoiceType.Trim();
+            if (!expenseTypes.TryGetValue(typeName, out var expenseType))
+            {
+                expenseType = new ExpenseType { Name = typeName };
+                expenseTypes[typeName] = expenseType;
+                dbContext.ExpenseTypes.Add(expenseType);
+            }
+
             dbContext.ExpenseInvoices.Add(new ExpenseInvoice
             {
+                ExpenseType = expenseType,
                 WorkOrderNumber = workOrder,
                 InvoiceType = invoiceType,
                 Description = description,

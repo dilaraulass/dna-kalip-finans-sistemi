@@ -66,4 +66,5 @@ public sealed record FinanceExpenseInvoiceResponse(
     string InvoiceNumber,
     string StatusKey,
     string Status,
-    int? DaysUntilDue);
+    int? DaysUntilDue,
+    int? ExpenseTypeId);

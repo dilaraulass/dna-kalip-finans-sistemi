@@ -12,6 +12,7 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
     public DbSet<ContractMilestone> ContractMilestones => Set<ContractMilestone>();
     public DbSet<PaymentTracking> PaymentTrackings => Set<PaymentTracking>();
     public DbSet<ExpenseInvoice> ExpenseInvoices => Set<ExpenseInvoice>();
+    public DbSet<ExpenseType> ExpenseTypes => Set<ExpenseType>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
@@ -96,6 +97,10 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
 
         modelBuilder.Entity<ExpenseInvoice>(entity =>
         {
+            entity.HasOne(invoice => invoice.ExpenseType)
+                .WithMany()
+                .HasForeignKey(invoice => invoice.ExpenseTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(invoice => invoice.WorkOrderNumber).HasMaxLength(50);
             entity.Property(invoice => invoice.InvoiceType).HasMaxLength(150);
             entity.Property(invoice => invoice.Description).HasMaxLength(500).IsRequired();
@@ -116,6 +121,19 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
                 .WithMany(company => company.ExpenseInvoices)
                 .HasForeignKey(invoice => invoice.CompanyId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ExpenseType>(entity =>
+        {
+            entity.Property(type => type.Name).HasMaxLength(150).IsRequired();
+            entity.HasIndex(type => type.Name).IsUnique();
+            entity.HasData(
+                new ExpenseType { Id = 1, Name = "Diğer" },
+                new ExpenseType { Id = 2, Name = "Fason İşçilik" },
+                new ExpenseType { Id = 3, Name = "Hammadde" },
+                new ExpenseType { Id = 4, Name = "Standart Malzeme" },
+                new ExpenseType { Id = 5, Name = "Isıl İşlem" },
+                new ExpenseType { Id = 6, Name = "Tel Erezyon" });
         });
 
         modelBuilder.Entity<ExchangeRate>(entity =>

@@ -385,6 +385,9 @@ namespace DnaKalip.Api.Migrations
                     b.Property<int>("DueDays")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ExpenseTypeId")
+                        .HasColumnType("int");
+
                     b.Property<DateOnly>("InvoiceDate")
                         .HasColumnType("date");
 
@@ -422,6 +425,8 @@ namespace DnaKalip.Api.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("ExpenseTypeId");
+
                     b.HasIndex("InvoiceDate");
 
                     b.HasIndex("IsArchived");
@@ -429,6 +434,59 @@ namespace DnaKalip.Api.Migrations
                     b.HasIndex("WorkOrderNumber");
 
                     b.ToTable("ExpenseInvoices");
+                });
+
+            modelBuilder.Entity("DnaKalip.Api.Entities.ExpenseType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ExpenseTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Diğer"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Fason İşçilik"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Hammadde"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Standart Malzeme"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Isıl İşlem"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Tel Erezyon"
+                        });
                 });
 
             modelBuilder.Entity("DnaKalip.Api.Entities.PaymentTracking", b =>
@@ -521,7 +579,14 @@ namespace DnaKalip.Api.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("DnaKalip.Api.Entities.ExpenseType", "ExpenseType")
+                        .WithMany()
+                        .HasForeignKey("ExpenseTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Company");
+
+                    b.Navigation("ExpenseType");
                 });
 
             modelBuilder.Entity("DnaKalip.Api.Entities.PaymentTracking", b =>

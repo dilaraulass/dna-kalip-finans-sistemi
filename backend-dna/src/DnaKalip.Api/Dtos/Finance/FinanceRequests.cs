@@ -24,7 +24,8 @@ public sealed record CreateExpenseInvoiceRequest(
     DateOnly? PaymentDate,
     string Status,
     bool InvoiceIssued,
-    string? InvoiceNumber);
+    string? InvoiceNumber,
+    int? ExpenseTypeId = null);
 
 public sealed record UpdateExpenseInvoiceRequest(
     Guid? CompanyId,
@@ -38,4 +39,5 @@ public sealed record UpdateExpenseInvoiceRequest(
     DateOnly? PaymentDate,
     string Status,
     bool InvoiceIssued,
-    string? InvoiceNumber);
+    string? InvoiceNumber,
+    int? ExpenseTypeId = null);

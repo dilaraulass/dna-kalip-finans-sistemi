@@ -19,6 +19,22 @@ public static class FinanceEndpoints
             .RequireAuthorization(AuthPolicies.AuthenticatedUser)
             .WithTags("Finance");
 
+        group.MapGet("/expense-types", async (DnaKalipDbContext db, CancellationToken cancellationToken) =>
+            Results.Ok(await db.ExpenseTypes.AsNoTracking().OrderBy(type => type.Name)
+                .Select(type => new { type.Id, type.Name }).ToListAsync(cancellationToken)));
+
+        group.MapGet("/companies/{companyId:guid}/expense-defaults", async (
+            Guid companyId, DnaKalipDbContext db, CancellationToken cancellationToken) =>
+        {
+            var defaults = await db.ExpenseInvoices.AsNoTracking()
+                .Where(invoice => invoice.CompanyId == companyId && !invoice.IsArchived)
+                .OrderByDescending(invoice => invoice.CreatedAt)
+                .ThenByDescending(invoice => invoice.Id)
+                .Select(invoice => new { invoice.DueDays, invoice.ExpenseTypeId })
+                .FirstOrDefaultAsync(cancellationToken);
+            return defaults is null ? Results.NoContent() : Results.Ok(defaults);
+        });
+
         group.MapGet("/dashboard", async (
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
@@ -130,7 +146,8 @@ public static class FinanceEndpoints
                         ? null
                         : invoice.Company.Name,
                     invoice.WorkOrderNumber,
-                    invoice.InvoiceType,
+                    invoice.ExpenseTypeId,
+                    InvoiceType = invoice.ExpenseType == null ? invoice.InvoiceType : invoice.ExpenseType.Name,
                     invoice.Description,
                     invoice.Amount,
                     invoice.Currency,
@@ -176,7 +193,8 @@ public static class FinanceEndpoints
                         invoice.InvoiceNumber ?? string.Empty,
                         status.StatusKey,
                         status.Status,
-                        status.DaysUntilDue);
+                        status.DaysUntilDue,
+                        invoice.ExpenseTypeId);
                 })
                 .ToList();
 
@@ -422,6 +440,8 @@ public static class FinanceEndpoints
                 request.CompanyId,
                 cancellationToken);
 
+            var expenseType = await ValidateExpenseTypeAsync(db, request.ExpenseTypeId, validationErrors, cancellationToken);
+
             if (validationErrors.Count > 0)
             {
                 return Results.ValidationProblem(validationErrors);
@@ -436,7 +456,8 @@ public static class FinanceEndpoints
             {
                 CompanyId = request.CompanyId,
                 WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber),
-                InvoiceType = NormalizeOptional(request.InvoiceType),
+                ExpenseTypeId = expenseType!.Id,
+                InvoiceType = expenseType.Name,
                 Description = NormalizeOptional(request.Description) ?? companyName ?? string.Empty,
                 Amount = request.Amount,
                 Currency = NormalizeCurrency(request.Currency),
@@ -484,6 +505,8 @@ public static class FinanceEndpoints
                 request.CompanyId,
                 cancellationToken);
 
+            var expenseType = await ValidateExpenseTypeAsync(db, request.ExpenseTypeId, validationErrors, cancellationToken);
+
             if (validationErrors.Count > 0)
             {
                 return Results.ValidationProblem(validationErrors);
@@ -506,7 +529,8 @@ public static class FinanceEndpoints
 
             invoice.CompanyId = request.CompanyId;
             invoice.WorkOrderNumber = NormalizeOptional(request.WorkOrderNumber);
-            invoice.InvoiceType = NormalizeOptional(request.InvoiceType);
+            invoice.ExpenseTypeId = expenseType!.Id;
+            invoice.InvoiceType = expenseType.Name;
             invoice.Description = NormalizeOptional(request.Description) ?? companyName ?? string.Empty;
             invoice.Amount = request.Amount;
             invoice.Currency = NormalizeCurrency(request.Currency);
@@ -584,6 +608,18 @@ public static class FinanceEndpoints
         }
 
         return errors;
+    }
+
+    private static async Task<ExpenseType?> ValidateExpenseTypeAsync(
+        DnaKalipDbContext db, int? expenseTypeId, Dictionary<string, string[]> errors,
+        CancellationToken cancellationToken)
+    {
+        var expenseType = expenseTypeId.HasValue
+            ? await db.ExpenseTypes.AsNoTracking().FirstOrDefaultAsync(type => type.Id == expenseTypeId, cancellationToken)
+            : null;
+        if (expenseType is null)
+            errors["expenseTypeId"] = ["Geçerli bir gider türü seçin."];
+        return expenseType;
     }
 
     private static Dictionary<string, string[]> ValidateExpenseInvoiceRequest(

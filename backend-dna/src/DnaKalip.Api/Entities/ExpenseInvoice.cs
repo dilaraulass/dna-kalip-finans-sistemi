@@ -4,6 +4,8 @@ public class ExpenseInvoice
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? CompanyId { get; set; }
+    public int? ExpenseTypeId { get; set; }
+    public ExpenseType? ExpenseType { get; set; }
     public string? WorkOrderNumber { get; set; }
     public string? InvoiceType { get; set; }
     public string Description { get; set; } = string.Empty;

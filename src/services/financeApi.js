@@ -47,6 +47,14 @@ export function getFinanceDashboard({ signal } = {}) {
   return request("/finance/dashboard", { signal });
 }
 
+export function getExpenseTypes({ signal } = {}) {
+  return request("/finance/expense-types", { signal });
+}
+
+export function getCompanyExpenseDefaults(companyId, { signal } = {}) {
+  return request(`/finance/companies/${companyId}/expense-defaults`, { signal });
+}
+
 export function getExchangeRates({ signal } = {}) {
   return request("/finance/exchange-rates", { signal });
 }
