@@ -4,6 +4,8 @@ using DnaKalip.Api.Dtos.Contracts;
 using DnaKalip.Api.Entities;
 using DnaKalip.Api.Services.Contracts;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Numerics;
 
 namespace DnaKalip.Api.Endpoints;
 
@@ -14,6 +16,41 @@ public static class ContractsEndpoints
         var group = app.MapGroup("/api/contracts")
             .RequireAuthorization(AuthPolicies.AuthenticatedUser)
             .WithTags("Contracts");
+
+        group.MapGet("/number-suggestions", async (
+            DnaKalipDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var contracts = await db.Contracts.AsNoTracking()
+                .Select(item => new { item.FinanceTab, item.ContractNumberSuffix, item.ContractNumber })
+                .ToListAsync(cancellationToken);
+            var suggestions = new Dictionary<string, string>();
+
+            foreach (var tab in new[] { "musteri", "tedarikci" })
+            {
+                var maximum = BigInteger.Zero;
+                var width = 3;
+                foreach (var contract in contracts.Where(item => item.FinanceTab == tab))
+                {
+                    var suffix = string.IsNullOrWhiteSpace(contract.ContractNumberSuffix)
+                        ? contract.ContractNumber.Split('-').Last().Trim()
+                        : contract.ContractNumberSuffix.Trim();
+                    if (suffix.Length == 0 || !suffix.All(char.IsAsciiDigit) ||
+                        !BigInteger.TryParse(suffix, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+                        continue;
+
+                    if (number > maximum)
+                    {
+                        maximum = number;
+                        width = Math.Max(3, suffix.Length);
+                    }
+                }
+
+                suggestions[tab] = (maximum + 1).ToString(CultureInfo.InvariantCulture).PadLeft(width, '0');
+            }
+
+            return Results.Ok(suggestions);
+        }).WithName("GetContractNumberSuggestions");
 
         group.MapGet(string.Empty, async (
             string? archiveStatus,

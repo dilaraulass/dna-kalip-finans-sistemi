@@ -54,6 +54,10 @@ export function getContractById(id, { signal } = {}) {
   return request(`/contracts/${id}`, { signal });
 }
 
+export function getContractNumberSuggestions({ signal } = {}) {
+  return request("/contracts/number-suggestions", { signal });
+}
+
 export function createContract(payload, { signal } = {}) {
   return request("/contracts", {
     method: "POST",

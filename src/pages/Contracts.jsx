@@ -8,6 +8,7 @@ import {
   createContract,
   getContractById,
   getContracts,
+  getContractNumberSuggestions,
   restoreContract,
   updateContract,
 } from "../services/contractsApi";
@@ -709,6 +710,8 @@ function ContractsPage() {
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [createForm, setCreateForm] = useState(INITIAL_CONTRACT_FORM);
   const [createError, setCreateError] = useState("");
+  const [numberSuggestionsLoading, setNumberSuggestionsLoading] = useState(false);
+  const [createSuffixes, setCreateSuffixes] = useState({});
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
@@ -928,10 +931,25 @@ function ContractsPage() {
     setContractArchiveStatus(nextStatus);
   }
 
-  function openCreateDrawer() {
+  async function openCreateDrawer() {
+    if (numberSuggestionsLoading) return;
     setCreateForm(INITIAL_CONTRACT_FORM);
     setCreateError("");
-    setCreateDrawerOpen(true);
+    setCreateSuffixes({});
+    setNumberSuggestionsLoading(true);
+    try {
+      const suggestions = await getContractNumberSuggestions();
+      setCreateSuffixes(suggestions);
+      setCreateForm({
+        ...INITIAL_CONTRACT_FORM,
+        contractNumberSuffix: suggestions[INITIAL_CONTRACT_FORM.financeTab] || "",
+      });
+    } catch {
+      setCreateError("Sözleşme numarası önerisi alınamadı. Numarayı elle girebilirsiniz.");
+    } finally {
+      setNumberSuggestionsLoading(false);
+      setCreateDrawerOpen(true);
+    }
   }
 
   function closeCreateDrawer() {
@@ -966,7 +984,16 @@ function ContractsPage() {
   }
 
   function handleCreateFormChange(event) {
-    setCreateForm((currentForm) => buildNextContractForm(currentForm, event));
+    const { name, value } = event.target;
+    if (name === "contractNumberSuffix") {
+      setCreateSuffixes((current) => ({ ...current, [createForm.financeTab]: value }));
+    }
+    setCreateForm((currentForm) => {
+      const nextForm = buildNextContractForm(currentForm, event);
+      return name === "financeTab"
+        ? { ...nextForm, contractNumberSuffix: createSuffixes[value] || "" }
+        : nextForm;
+    });
   }
 
   function handleEditFormChange(event) {
@@ -1175,7 +1202,8 @@ function ContractsPage() {
               className="contracts-primary-btn"
               onClick={openCreateDrawer}
             >
-              Yeni Sözleşme
+              disabled={numberSuggestionsLoading}
+              {numberSuggestionsLoading ? "Numara hazırlanıyor..." : "Yeni Sözleşme"}
             </button>
 
             <input
