@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import { formatDate, sortRows } from "../../services/tableDisplay";
+import SortableHeader from "../ui/SortableHeader";
 import {
   ALL_FILTER_VALUE,
   CURRENCY_OPTIONS,
@@ -34,6 +36,7 @@ function PaymentMilestoneTable({
 }) {
   const [invoiceDrafts, setInvoiceDrafts] = useState({});
   const [savingRowIds, setSavingRowIds] = useState({});
+  const [sort, setSort] = useState({});
   const [editingCell, setEditingCell] = useState(null);
   const cancelledEditRef = useRef("");
 
@@ -240,7 +243,7 @@ function PaymentMilestoneTable({
     const groups = [];
     const groupMap = new Map();
 
-    rows.forEach((row) => {
+    sortRows(rows, sort).forEach((row) => {
       const groupKey = row.contractId || row.contractNumber;
       let group = groupMap.get(groupKey);
 
@@ -264,7 +267,7 @@ function PaymentMilestoneTable({
     });
 
     return groups;
-  }, [rows]);
+  }, [rows, sort]);
 
   function renderInvoiceIssuedCell(row) {
     const draft = getInvoiceDraft(row);
@@ -364,7 +367,7 @@ function PaymentMilestoneTable({
           <button
             type="button"
             className="finance-primary-btn"
-            onClick={onExportExcel}
+            onClick={() => onExportExcel(groupedRows.flatMap((group) => group.items))}
             disabled={rows.length === 0}
           >
             Excel&apos;e Aktar
@@ -438,19 +441,19 @@ function PaymentMilestoneTable({
         <table className="finance-grouped-table">
           <thead>
             <tr>
-              <th>Sözleşme No</th>
-              <th>{activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi"}</th>
-              <th>İş Emri No</th>
-              <th>Parça Ref. No</th>
-              <th>Sözleşme Bedeli</th>
-              <th>Hakediş Şartı</th>
-              <th>Vade</th>
-              <th>Onay Trh.</th>
-              <th>Ödeme Trh.</th>
-              <th>Fatura Kesildi</th>
-              <th>Fatura No</th>
-              <th>Tutar</th>
-              <th>Durum</th>
+              <SortableHeader field="contractNumber" sort={sort} onSort={setSort}>Sözleşme No</SortableHeader>
+              <SortableHeader field="company" sort={sort} onSort={setSort}>{activeTab === FINANCE_MODULES.customer ? "Müşteri" : "Tedarikçi"}</SortableHeader>
+              <SortableHeader field="workOrder" sort={sort} onSort={setSort}>İş Emri No</SortableHeader>
+              <SortableHeader field="referenceNumber" sort={sort} onSort={setSort}>Parça Ref. No</SortableHeader>
+              <SortableHeader field="convertedContractAmount" sort={sort} onSort={setSort}>Sözleşme Bedeli</SortableHeader>
+              <SortableHeader field="milestoneCondition" sort={sort} onSort={setSort}>Hakediş Şartı</SortableHeader>
+              <SortableHeader field="activeDueDays" sort={sort} onSort={setSort}>Vade</SortableHeader>
+              <SortableHeader field="approvalDate" sort={sort} onSort={setSort}>Onay Trh.</SortableHeader>
+              <SortableHeader field="paymentDate" sort={sort} onSort={setSort}>Ödeme Trh.</SortableHeader>
+              <SortableHeader field="invoiceIssued" sort={sort} onSort={setSort}>Fatura Kesildi</SortableHeader>
+              <SortableHeader field="invoiceNumber" sort={sort} onSort={setSort}>Fatura No</SortableHeader>
+              <SortableHeader field="convertedAmount" sort={sort} onSort={setSort}>Tutar</SortableHeader>
+              <SortableHeader field="status" sort={sort} onSort={setSort}>Durum</SortableHeader>
             </tr>
           </thead>
           <tbody>
@@ -525,7 +528,7 @@ function PaymentMilestoneTable({
                         row,
                         "approvalDate",
                         "Onay tarihi",
-                        row.approvalDate || "-",
+                        formatDate(row.approvalDate),
                         "date",
                       )}
                     </td>
@@ -534,7 +537,7 @@ function PaymentMilestoneTable({
                         row,
                         "paymentDate",
                         "Ödeme tarihi",
-                        row.paymentDate || "-",
+                        formatDate(row.paymentDate),
                         "date",
                       )}
                     </td>

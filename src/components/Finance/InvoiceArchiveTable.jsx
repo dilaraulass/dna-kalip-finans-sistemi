@@ -1,4 +1,7 @@
 import { CURRENCY_OPTIONS } from "../../constants/financeConstants";
+import { useState } from "react";
+import { formatDate, sortRows } from "../../services/tableDisplay";
+import SortableHeader from "../ui/SortableHeader";
 import { formatMoney } from "../../services/financeService";
 
 function InvoiceArchiveTable({
@@ -13,6 +16,7 @@ function InvoiceArchiveTable({
   setSearchText,
   onExportExcel,
 }) {
+  const [sort, setSort] = useState({});
   return (
     <>
       <div className="table-header">
@@ -32,7 +36,7 @@ function InvoiceArchiveTable({
           <button
             type="button"
             className="finance-primary-btn"
-            onClick={onExportExcel}
+            onClick={() => onExportExcel(sortRows(rows, sort))}
             disabled={rows.length === 0}
           >
             Excel&apos;e Aktar
@@ -89,14 +93,14 @@ function InvoiceArchiveTable({
         <table className="finance-grouped-table invoice-archive-table">
           <thead>
             <tr>
-              <th>Kaynak</th>
-              <th>Belge / Sözleşme</th>
-              <th>Firma</th>
-              <th>İş Emri</th>
-              <th>Fatura No</th>
-              <th>Fatura Tarihi</th>
-              <th>Tutar</th>
-              <th>Durum</th>
+              <SortableHeader field="sourceLabel" sort={sort} onSort={setSort}>Kaynak</SortableHeader>
+              <SortableHeader field="documentNumber" sort={sort} onSort={setSort}>Belge / Sözleşme</SortableHeader>
+              <SortableHeader field="company" sort={sort} onSort={setSort}>Firma</SortableHeader>
+              <SortableHeader field="workOrder" sort={sort} onSort={setSort}>İş Emri</SortableHeader>
+              <SortableHeader field="invoiceNumber" sort={sort} onSort={setSort}>Fatura No</SortableHeader>
+              <SortableHeader field="invoiceDate" sort={sort} onSort={setSort}>Fatura Tarihi</SortableHeader>
+              <SortableHeader field="convertedAmount" sort={sort} onSort={setSort}>Tutar</SortableHeader>
+              <SortableHeader field="status" sort={sort} onSort={setSort}>Durum</SortableHeader>
             </tr>
           </thead>
           <tbody>
@@ -108,14 +112,14 @@ function InvoiceArchiveTable({
               </tr>
             )}
 
-            {rows.map((row) => (
+            {sortRows(rows, sort).map((row) => (
               <tr key={row.archiveId}>
                 <td>{row.sourceLabel}</td>
                 <td>{row.documentNumber}</td>
                 <td>{row.company}</td>
                 <td>{row.workOrder || "-"}</td>
                 <td>{row.invoiceNumber || "-"}</td>
-                <td>{row.invoiceDate || "-"}</td>
+                <td>{formatDate(row.invoiceDate)}</td>
                 <td className="finance-amount-cell">
                   <strong>{formatMoney(row.originalAmount, row.currency)}</strong>
                   {row.currency !== displayCurrency && (

@@ -14,6 +14,7 @@ import {
 } from "../services/contractsApi";
 import { getCompanies } from "../services/companiesApi";
 import logo from "../assets/logo.png";
+import { formatDate } from "../services/tableDisplay";
 import "./Contracts.css";
 
 const FINANCE_TAB_LABELS = {
@@ -709,9 +710,9 @@ function ContractsPage() {
   const [detailError, setDetailError] = useState("");
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const [createForm, setCreateForm] = useState(INITIAL_CONTRACT_FORM);
-  const [createError, setCreateError] = useState("");
   const [numberSuggestionsLoading, setNumberSuggestionsLoading] = useState(false);
   const [createSuffixes, setCreateSuffixes] = useState({});
+  const [createError, setCreateError] = useState("");
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
@@ -870,7 +871,7 @@ function ContractsPage() {
         field: "contractDate",
         headerName: "Tarih",
         width: 120,
-        valueFormatter: (value) => formatValue(value),
+        valueFormatter: formatDate,
       },
       {
         field: "totalAmount",
@@ -1201,8 +1202,8 @@ function ContractsPage() {
               type="button"
               className="contracts-primary-btn"
               onClick={openCreateDrawer}
-            >
               disabled={numberSuggestionsLoading}
+            >
               {numberSuggestionsLoading ? "Numara hazırlanıyor..." : "Yeni Sözleşme"}
             </button>
 
@@ -2629,7 +2630,7 @@ function ContractDetail({
           <DetailField label="Sözleşme No" value={contract.contractNumber} />
           <DetailField label="Tür" value={formatFinanceTab(contract.financeTab)} />
           <DetailField label="Firma" value={contract.company?.name} />
-          <DetailField label="Tarih" value={contract.contractDate} />
+          <DetailField label="Tarih" value={formatDate(contract.contractDate)} />
           <DetailField label="İş Emri" value={contract.workOrderNumber} />
           <DetailField label="Referans No" value={contract.referenceNumber} />
           <DetailField label="Proje No" value={contract.projectNumber} />

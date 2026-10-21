@@ -1,6 +1,7 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { useState } from "react";
+import { formatDate, sortRows } from "../../services/tableDisplay";
 import {
   ALL_FILTER_VALUE,
   CURRENCY_OPTIONS,
@@ -42,6 +43,7 @@ function ExpenseInvoiceTable({
   onInvoiceInlineValidationError,
 }) {
   const [invoiceDrafts, setInvoiceDrafts] = useState({});
+  const [sortModel, setSortModel] = useState([]);
   const [savingInvoiceIds, setSavingInvoiceIds] = useState({});
 
   function getInvoiceDraft(row) {
@@ -101,16 +103,17 @@ function ExpenseInvoiceTable({
     { field: "company", headerName: "Firma", width: 220 },
     {
       field: "convertedAmount",
+      type: "number",
       headerName: "Tutar",
       width: 140,
       valueFormatter: (value) => formatMoney(value, displayCurrency),
     },
-    { field: "invoiceDate", headerName: "Fatura Tarihi", width: 125 },
+    { field: "invoiceDate", headerName: "Fatura Tarihi", width: 125, valueFormatter: formatDate },
     {
       field: "invoiceIssued",
       headerName: "Fatura Kesildi",
       width: 135,
-      sortable: false,
+      sortable: true,
       renderCell: ({ row }) => {
         const draft = getInvoiceDraft(row);
         const isSaving = Boolean(savingInvoiceIds[row.id]);
@@ -142,7 +145,7 @@ function ExpenseInvoiceTable({
       field: "invoiceNumber",
       headerName: "Fatura No",
       width: 150,
-      sortable: false,
+      sortable: true,
       renderCell: ({ row }) => {
         const draft = getInvoiceDraft(row);
         const isSaving = Boolean(savingInvoiceIds[row.id]);
@@ -174,8 +177,8 @@ function ExpenseInvoiceTable({
         );
       },
     },
-    { field: "dueDays", headerName: "Vade", width: 80 },
-    { field: "paymentDate", headerName: "Ödeme Tarihi", width: 125 },
+    { field: "dueDays", headerName: "Vade", width: 80, type: "number" },
+    { field: "paymentDate", headerName: "Ödeme Tarihi", width: 125, valueFormatter: formatDate },
     {
       field: "status",
       headerName: "Durum",
@@ -209,7 +212,7 @@ function ExpenseInvoiceTable({
           <button
             type="button"
             className="finance-primary-btn"
-            onClick={onExportExcel}
+            onClick={() => onExportExcel(sortRows(rows, { field: sortModel[0]?.field, direction: sortModel[0]?.sort }))}
             disabled={rows.length === 0}
           >
             Excel&apos;e Aktar
@@ -313,6 +316,8 @@ function ExpenseInvoiceTable({
         <DataGrid
           rows={rows}
           columns={columns}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
           pageSizeOptions={[10, 25, 50, 100]}
           initialState={{
             pagination: {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatDate } from "../../services/tableDisplay";
 import {
   CURRENCIES,
   CURRENCY_OPTIONS,
@@ -142,17 +143,17 @@ function ExpenseDetail({
             <div className="finance-detail-grid">
               <div>
                 <span>Fatura Tarihi</span>
-                <strong>{selectedRow.invoiceDate || "-"}</strong>
+                <strong>{formatDate(selectedRow.invoiceDate)}</strong>
               </div>
 
               <div>
                 <span>Ödeme Tarihi</span>
-                <strong>{selectedRow.paymentDate || "-"}</strong>
+                <strong>{formatDate(selectedRow.paymentDate)}</strong>
               </div>
 
               <div>
                 <span>Hesaplanan Vade Tarihi</span>
-                <strong>{selectedRow.expectedPaymentDate || "-"}</strong>
+                <strong>{formatDate(selectedRow.expectedPaymentDate)}</strong>
               </div>
 
               <div>

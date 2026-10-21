@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FiFileText } from "react-icons/fi";
+import { formatDate } from "../../services/tableDisplay";
 import "./FinanceDetail.css";
 import {
   PAYMENT_STATUSES,
@@ -181,12 +182,12 @@ function FinanceDetail({
 
           <div>
             <span>Onay Tarihi</span>
-            <strong>{selectedRow.approvalDate || "-"}</strong>
+            <strong>{formatDate(selectedRow.approvalDate)}</strong>
           </div>
 
           <div>
             <span>Ödeme / Tahsilat Tarihi</span>
-            <strong>{selectedRow.paymentDate || "-"}</strong>
+            <strong>{formatDate(selectedRow.paymentDate)}</strong>
           </div>
 
           <div>

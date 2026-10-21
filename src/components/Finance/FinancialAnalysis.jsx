@@ -4,6 +4,9 @@ import {
 } from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
 import ViewModeSwitch from "../ui/ViewModeSwitch";
+import { useState } from "react";
+import { formatDate, sortRows } from "../../services/tableDisplay";
+import SortableHeader from "../ui/SortableHeader";
 
 const ANALYSIS_MODES = [
   { value: "general", label: "Genel Durum" },
@@ -13,9 +16,9 @@ const ANALYSIS_MODES = [
 
 function groupDetailsByWorkOrder(details) {
   return details.reduce((groups, detail) => {
-    const lastGroup = groups.at(-1);
+    const lastGroup = groups.find((group) => group.workOrder === detail.workOrder);
 
-    if (!lastGroup || lastGroup.workOrder !== detail.workOrder) {
+    if (!lastGroup) {
       groups.push({ workOrder: detail.workOrder, items: [detail] });
     } else {
       lastGroup.items.push(detail);
@@ -97,8 +100,10 @@ function FinancialAnalysis({
   setDisplayCurrency,
 }) {
   const analysisTotals = analysisReport.totals;
-  const incomeGroups = groupDetailsByWorkOrder(analysisReport.incomeDetails);
-  const expenseGroups = groupDetailsByWorkOrder(analysisReport.expenseDetails);
+  const [incomeSort, setIncomeSort] = useState({});
+  const [expenseSort, setExpenseSort] = useState({});
+  const incomeGroups = groupDetailsByWorkOrder(sortRows(analysisReport.incomeDetails, incomeSort));
+  const expenseGroups = groupDetailsByWorkOrder(sortRows(analysisReport.expenseDetails, expenseSort));
   const hasAnalysisDetails =
     analysisReport.incomeDetails.length > 0 ||
     analysisReport.expenseDetails.length > 0;
@@ -253,7 +258,7 @@ function FinancialAnalysis({
             </td>
           )}
           <td>
-            <strong>{detail.date}</strong>
+            <strong>{formatDate(detail.date)}</strong>
             <span>{detail.description}</span>
             <small>{detail.type}</small>
           </td>
@@ -430,9 +435,9 @@ function FinancialAnalysis({
               <table className="analysis-table">
                 <thead>
                   <tr>
-                    <th>İş Emri</th>
-                    <th>Tarih / Açıklama</th>
-                    <th>Tutar</th>
+                    <SortableHeader field="workOrder" sort={incomeSort} onSort={setIncomeSort}>İş Emri</SortableHeader>
+                    <SortableHeader field="date" sort={incomeSort} onSort={setIncomeSort}>Tarih / Açıklama</SortableHeader>
+                    <SortableHeader field="income" sort={incomeSort} onSort={setIncomeSort}>Tutar</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -455,9 +460,9 @@ function FinancialAnalysis({
               <table className="analysis-table">
                 <thead>
                   <tr>
-                    <th>İş Emri</th>
-                    <th>Tarih / Açıklama</th>
-                    <th>Tutar</th>
+                    <SortableHeader field="workOrder" sort={expenseSort} onSort={setExpenseSort}>İş Emri</SortableHeader>
+                    <SortableHeader field="date" sort={expenseSort} onSort={setExpenseSort}>Tarih / Açıklama</SortableHeader>
+                    <SortableHeader field="expense" sort={expenseSort} onSort={setExpenseSort}>Tutar</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>

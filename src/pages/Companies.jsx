@@ -44,7 +44,7 @@ function formatDateTime(value) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "medium",
+    dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
 }
@@ -53,7 +53,9 @@ function formatDate(value) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "medium",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(new Date(value));
 }
 

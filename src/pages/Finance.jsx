@@ -764,7 +764,7 @@ function Finance() {
     setInlineUpdateError(message);
   }
 
-  function handlePaymentExcelExport() {
+  function handlePaymentExcelExport(exportRows = filteredRows) {
     const moduleTitle =
       activeTab === FINANCE_MODULES.customer
         ? "Müşteri Tahsilatları"
@@ -779,27 +779,27 @@ function Finance() {
       title: moduleTitle,
       description: `${filteredRows.length} kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
       columns: getPaymentExportColumns({ companyLabel, displayCurrency }),
-      rows: filteredRows,
+      rows: exportRows,
     });
   }
 
-  function handleExpenseExcelExport() {
+  function handleExpenseExcelExport(exportRows = filteredExpenseRows) {
     exportRowsToExcel({
       filenamePrefix: "ek-gider-faturalari",
       title: "Ek Gider Faturaları",
       description: `${filteredExpenseRows.length} kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
       columns: getExpenseExportColumns({ displayCurrency }),
-      rows: filteredExpenseRows,
+      rows: exportRows,
     });
   }
 
-  function handleInvoiceArchiveExcelExport() {
+  function handleInvoiceArchiveExcelExport(exportRows = filteredInvoiceArchiveRows) {
     exportRowsToExcel({
       filenamePrefix: "arsivlenen-faturalar",
       title: "Arşivlenenler",
       description: `${filteredInvoiceArchiveRows.length} faturası kesilmiş kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
       columns: getInvoiceArchiveExportColumns({ displayCurrency }),
-      rows: filteredInvoiceArchiveRows,
+      rows: exportRows,
     });
   }
 
