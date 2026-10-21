@@ -6,6 +6,7 @@ function FinanceStatusCards({
   statusFilter,
   onStatusFilterChange,
   activeStats,
+  mixedCurrencies = false,
   displayCurrency,
   expenseModule,
   transactionLabel,
@@ -28,7 +29,13 @@ function FinanceStatusCards({
                 : `Toplam ${transactionLabel}`
               : label}
           </h3>
-          <p>{formatMoney(activeStats[key], displayCurrency)}</p>
+          {mixedCurrencies ? (
+            typeof activeStats[key] === "object"
+              ? Object.entries(activeStats[key]).sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => (
+                <p key={currency}>{formatMoney(amount, currency)}</p>
+              ))
+              : <p>—</p>
+          ) : <p>{formatMoney(activeStats[key], displayCurrency)}</p>}
         </button>
       ))}
     </div>

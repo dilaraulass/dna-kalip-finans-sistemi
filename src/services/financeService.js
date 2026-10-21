@@ -626,3 +626,13 @@ export function formatMoney(amount, currency) {
     maximumFractionDigits: 0,
   }).format(amount)} ${currency}`;
 }
+// Keep display-only currency choices out of financial analysis calculations.
+export function getContractCurrencyRow(row, exchangeRates) {
+  const currency = row.contractCurrency || row.currency;
+  return {
+    ...row,
+    displayCurrency: currency,
+    convertedAmount: convertAmount(row.amount, row.currency, currency, exchangeRates, row),
+    convertedContractAmount: row.contractAmount,
+  };
+}

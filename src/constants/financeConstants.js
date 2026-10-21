@@ -22,6 +22,7 @@ export const PAYMENT_STATUS_OPTIONS = [
 ];
 
 export const ALL_FILTER_VALUE = "all";
+export const CONTRACT_CURRENCY_OPTION = "contract";
 
 export const STATUS_KEYS = {
   all: ALL_FILTER_VALUE,

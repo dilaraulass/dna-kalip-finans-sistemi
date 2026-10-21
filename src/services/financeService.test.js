@@ -8,7 +8,27 @@ import {
   convertAmount,
   extractAmount,
   isCustomerContract,
+  getContractCurrencyRow,
 } from "./financeService.js";
+
+test("contract currency display preserves original amounts without mutating analysis rows", () => {
+  for (const currency of ["TRY", "EUR", "USD"]) {
+    const row = { currency, contractCurrency: currency, amount: 100,
+      contractAmount: 1000, convertedAmount: 25, convertedContractAmount: 250 };
+    const displayed = getContractCurrencyRow(row, { TRY: 1, EUR: 50, USD: 40 });
+    assert.equal(displayed.displayCurrency, currency);
+    assert.equal(displayed.convertedAmount, 100);
+    assert.equal(displayed.convertedContractAmount, 1000);
+    assert.equal(row.convertedAmount, 25);
+  }
+});
+
+test("contract display converts a differently denominated milestone to contract currency", () => {
+  const row = { currency: "TRY", contractCurrency: "EUR", amount: 5000, contractAmount: 1000 };
+  const displayed = getContractCurrencyRow(row, { TRY: 1, EUR: 50, USD: 40 });
+  assert.equal(displayed.convertedAmount, 100);
+  assert.equal(displayed.displayCurrency, "EUR");
+});
 
 test("extractAmount parses Turkish formatted values", () => {
   assert.equal(extractAmount("117.000 EUR"), 117000);

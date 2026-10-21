@@ -5,6 +5,7 @@ import {
   buildContractInvoiceArchiveRows,
   convertAmount,
   formatMoney,
+  getContractCurrencyRow,
 } from "../services/financeService";
 import {
   archiveExpenseInvoice,
@@ -32,6 +33,7 @@ import FinanceDetail from "../components/FinanceDetail/FinanceDetail";
 import ExpenseDetail from "../components/ExpenseDetail/ExpenseDetail";
 import {
   ALL_FILTER_VALUE,
+  CONTRACT_CURRENCY_OPTION,
   DEFAULT_EXCHANGE_RATES,
   CURRENCIES,
   FINANCE_MODULES,
@@ -90,7 +92,7 @@ function getPaymentExportColumns({ companyLabel, displayCurrency }) {
       value: (row) => {
         const originalAmount = formatMoney(row.contractAmount, row.contractCurrency);
 
-        if (row.contractCurrency === displayCurrency) {
+        if (row.contractCurrency === (row.displayCurrency || displayCurrency)) {
           return originalAmount;
         }
 
@@ -121,7 +123,7 @@ function getPaymentExportColumns({ companyLabel, displayCurrency }) {
     {
       label: "Tutar",
       width: 130,
-      value: (row) => formatMoney(row.convertedAmount, displayCurrency),
+      value: (row) => formatMoney(row.convertedAmount, row.displayCurrency || displayCurrency),
     },
     { label: "Durum", width: 120, value: (row) => row.status },
   ];
@@ -206,6 +208,7 @@ function Finance() {
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [displayCurrency, setDisplayCurrency] = useState(CURRENCIES.eur);
+  const [showContractCurrency, setShowContractCurrency] = useState(false);
   const [expenseViewMode, setExpenseViewMode] = useState("grouped");
   const [reportMode, setReportMode] = useState("general");
   const [reportMonth, setReportMonth] = useState("");
@@ -316,11 +319,12 @@ function Finance() {
   );
 
   const paymentRows = useMemo(() => {
-    if (activeTab === FINANCE_MODULES.supplier) return supplierRows;
-    if (activeTab === FINANCE_MODULES.customer) return customerRows;
-
-    return [];
-  }, [activeTab, customerRows, supplierRows]);
+    const rows = activeTab === FINANCE_MODULES.supplier ? supplierRows
+      : activeTab === FINANCE_MODULES.customer ? customerRows : [];
+    return showContractCurrency
+      ? rows.map((row) => getContractCurrencyRow(row, financeData.exchangeRates))
+      : rows;
+  }, [activeTab, customerRows, supplierRows, showContractCurrency, financeData.exchangeRates]);
 
   const expenseRows = useMemo(
     () =>
@@ -435,12 +439,18 @@ function Finance() {
 
       if (!matchesDate) return;
 
-      result[STATUS_KEYS.all] += row.convertedAmount;
-      result[row.statusKey] += row.convertedAmount;
+      for (const key of [STATUS_KEYS.all, row.statusKey]) {
+        if (showContractCurrency) {
+          if (typeof result[key] !== "object") result[key] = {};
+          result[key][row.displayCurrency] = (result[key][row.displayCurrency] || 0) + row.convertedAmount;
+        } else {
+          result[key] += row.convertedAmount;
+        }
+      }
     });
 
     return result;
-  }, [companyRows, dateEnd, dateStart]);
+  }, [companyRows, dateEnd, dateStart, showContractCurrency]);
 
   const expenseCompanies = useMemo(
     () =>
@@ -723,6 +733,7 @@ function Finance() {
       companyId: row.companyId || null,
       workOrderNumber: row.workOrder === "GENEL" ? null : row.workOrder || null,
       invoiceType: row.invoiceType || null,
+      expenseTypeId: row.expenseTypeId || null,
       description: row.company,
       amount: row.amount,
       currency: row.currency,
@@ -733,7 +744,6 @@ function Finance() {
       invoiceIssued: invoiceFields.invoiceIssued,
       invoiceNumber: invoiceFields.invoiceIssued
         ? invoiceFields.invoiceNumber.trim()
-      expenseTypeId: row.expenseTypeId || null,
         : null,
     };
 
@@ -778,7 +788,7 @@ function Finance() {
     exportRowsToExcel({
       filenamePrefix,
       title: moduleTitle,
-      description: `${filteredRows.length} kayıt aktarılıyor. Para birimi: ${displayCurrency}`,
+      description: `${exportRows.length} kayıt aktarılıyor. Para birimi: ${showContractCurrency ? "Sözleşmedeki para birimi" : displayCurrency}`,
       columns: getPaymentExportColumns({ companyLabel, displayCurrency }),
       rows: exportRows,
     });
@@ -950,6 +960,7 @@ function Finance() {
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           activeStats={activeStats}
+          mixedCurrencies={paymentModule && showContractCurrency}
           displayCurrency={displayCurrency}
           expenseModule={expenseModule}
           transactionLabel={transactionLabel}
@@ -986,8 +997,11 @@ function Finance() {
               setDateStart={setDateStart}
               dateEnd={dateEnd}
               setDateEnd={setDateEnd}
-              displayCurrency={displayCurrency}
-              setDisplayCurrency={setDisplayCurrency}
+              displayCurrency={showContractCurrency ? CONTRACT_CURRENCY_OPTION : displayCurrency}
+              setDisplayCurrency={(value) => {
+                setShowContractCurrency(value === CONTRACT_CURRENCY_OPTION);
+                if (value !== CONTRACT_CURRENCY_OPTION) setDisplayCurrency(value);
+              }}
               setStatusFilter={setStatusFilter}
               searchText={searchText}
               setSearchText={setSearchText}
@@ -1096,6 +1110,9 @@ function Finance() {
             archiving={detailArchiveSubmitting}
             mode={selectedRow?.isNew ? "create" : "edit"}
             companyOptions={companyOptions}
+            onCompanyCreated={(company) => setCompanyOptions((current) =>
+              [...current.filter((item) => item.id !== company.id), company]
+                .sort((a, b) => a.name.localeCompare(b.name, "tr")))}
             onSave={handleExpenseInvoiceSave}
             onArchive={handleExpenseInvoiceArchive}
           />
@@ -1110,9 +1127,6 @@ function Finance() {
             onPreviewContract={handlePreviewContract}
           />
         )}
-            onCompanyCreated={(company) => setCompanyOptions((current) =>
-              [...current.filter((item) => item.id !== company.id), company]
-                .sort((a, b) => a.name.localeCompare(b.name, "tr")))}
       </Drawer>
 
       <Drawer

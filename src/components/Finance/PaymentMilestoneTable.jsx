@@ -4,6 +4,7 @@ import SortableHeader from "../ui/SortableHeader";
 import {
   ALL_FILTER_VALUE,
   CURRENCY_OPTIONS,
+  CONTRACT_CURRENCY_OPTION,
   FINANCE_MODULES,
   PAYMENT_STATUS_OPTIONS,
 } from "../../constants/financeConstants";
@@ -35,8 +36,8 @@ function PaymentMilestoneTable({
   onInvoiceInlineValidationError,
 }) {
   const [invoiceDrafts, setInvoiceDrafts] = useState({});
-  const [savingRowIds, setSavingRowIds] = useState({});
   const [sort, setSort] = useState({});
+  const [savingRowIds, setSavingRowIds] = useState({});
   const [editingCell, setEditingCell] = useState(null);
   const cancelledEditRef = useRef("");
 
@@ -415,6 +416,7 @@ function PaymentMilestoneTable({
             value={displayCurrency}
             onChange={(event) => setDisplayCurrency(event.target.value)}
           >
+            <option value={CONTRACT_CURRENCY_OPTION}>Sözleşmedeki Para Birimi</option>
             {CURRENCY_OPTIONS.map((currency) => (
               <option key={currency} value={currency}>
                 {currency}
@@ -498,7 +500,7 @@ function PaymentMilestoneTable({
                           <strong>
                             {formatMoney(group.contractAmount, group.contractCurrency)}
                           </strong>
-                          {group.contractCurrency !== displayCurrency && (
+                          {displayCurrency !== CONTRACT_CURRENCY_OPTION && group.contractCurrency !== displayCurrency && (
                             <span>
                               {formatMoney(
                                 group.convertedContractAmount,
@@ -555,7 +557,7 @@ function PaymentMilestoneTable({
                       </>
                     )}
                     <td className="finance-amount-cell">
-                      {formatMoney(row.convertedAmount, displayCurrency)}
+                      {formatMoney(row.convertedAmount, row.displayCurrency || displayCurrency)}
                     </td>
                     <td className="finance-center-cell">
                       {renderEditableCell(

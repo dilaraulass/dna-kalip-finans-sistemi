@@ -152,7 +152,7 @@ function FinanceDetail({
             <strong>
               {formatMoney(
                 selectedRow.convertedContractAmount,
-                displayCurrency,
+                selectedRow.displayCurrency || displayCurrency,
               )}
             </strong>
           </div>
@@ -176,7 +176,7 @@ function FinanceDetail({
           <div>
             <span>Tutar</span>
             <strong>
-              {formatMoney(selectedRow.convertedAmount, displayCurrency)}
+              {formatMoney(selectedRow.convertedAmount, selectedRow.displayCurrency || displayCurrency)}
             </strong>
           </div>
 
