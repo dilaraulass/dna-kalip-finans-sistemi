@@ -359,6 +359,11 @@
   transition: background 0.15s ease;
 }
 
+/* Apply to cells so the divider also spans merged contract columns. */
+.finance-grouped-table tbody tr.finance-contract-start > td {
+  border-top: 3px solid #64748b;
+}
+
 .finance-grouped-table tbody tr:hover {
   background: #f8fafc;
 }

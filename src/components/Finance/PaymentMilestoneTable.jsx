@@ -467,9 +467,10 @@ function PaymentMilestoneTable({
               </tr>
             )}
 
-            {groupedRows.map((group) =>
+            {groupedRows.map((group, groupIndex) =>
               group.items.map((row, rowIndex) => {
                 const rowClasses = [
+                  rowIndex === 0 && groupIndex > 0 ? "finance-contract-start" : "",
                   `finance-row-${row.statusKey}`,
                   row.id === selectedRowId ? "selected-grid-row" : "",
                 ]
