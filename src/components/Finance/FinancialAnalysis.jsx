@@ -3,6 +3,7 @@ import {
   CURRENCY_OPTIONS,
 } from "../../constants/financeConstants";
 import { formatMoney } from "../../services/financeService";
+import { useAuth } from "../../auth/useAuth";
 import ViewModeSwitch from "../ui/ViewModeSwitch";
 import { useState } from "react";
 import { formatDate, sortRows } from "../../services/tableDisplay";
@@ -100,6 +101,7 @@ function FinancialAnalysis({
   setDisplayCurrency,
 }) {
   const analysisTotals = analysisReport.totals;
+  const { can } = useAuth();
   const [incomeSort, setIncomeSort] = useState({});
   const [expenseSort, setExpenseSort] = useState({});
   const incomeGroups = groupDetailsByWorkOrder(sortRows(analysisReport.incomeDetails, incomeSort));
@@ -121,6 +123,7 @@ function FinancialAnalysis({
         : "Sistemdeki tüm kayıtlar kümülatif olarak analiz ediliyor.";
 
   const handleExportExcel = () => {
+    if (!can("documents.export")) return;
     const summaryRows = [
       {
         label: "Tahsil Edilen",
@@ -420,7 +423,7 @@ function FinancialAnalysis({
             type="button"
             className="analysis-export-btn"
             onClick={handleExportExcel}
-            disabled={!hasAnalysisDetails}
+            disabled={!hasAnalysisDetails || !can("documents.export")}
           >
             Excel'e Aktar
           </button>

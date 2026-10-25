@@ -605,6 +605,7 @@ export function convertAmount(
   rates,
   options = {},
 ) {
+  if (amount === null) return null;
   if (!amount || fromCurrency === toCurrency) return amount || 0;
 
   const normalizedFrom = normalizeCurrency(fromCurrency);
@@ -621,6 +622,7 @@ export function convertAmount(
 }
 
 export function formatMoney(amount, currency) {
+  if (amount === null) return "***";
   return `${new Intl.NumberFormat("tr-TR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,

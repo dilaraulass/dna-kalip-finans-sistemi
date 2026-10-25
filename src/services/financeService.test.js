@@ -6,10 +6,20 @@ import {
   buildFinancialAnalysis,
   buildFinanceMilestones,
   convertAmount,
+  formatMoney,
   extractAmount,
   isCustomerContract,
   getContractCurrencyRow,
 } from "./financeService.js";
+
+test("redacted financial values remain hidden across currency views", () => {
+  assert.equal(convertAmount(null, "EUR", "TRY", { EUR: 50 }), null);
+  assert.equal(convertAmount(null, "EUR", "EUR", { EUR: 50 }), null);
+  assert.equal(formatMoney(null, "EUR"), "***");
+  const displayed = getContractCurrencyRow({ currency: "TRY", contractCurrency: "EUR", amount: null, contractAmount: null }, { EUR: 50 });
+  assert.equal(displayed.convertedAmount, null);
+  assert.equal(displayed.convertedContractAmount, null);
+});
 
 test("contract currency display preserves original amounts without mutating analysis rows", () => {
   for (const currency of ["TRY", "EUR", "USD"]) {

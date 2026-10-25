@@ -6,6 +6,8 @@ using DnaKalip.Api.Services.Contracts;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Numerics;
+using System.Security.Claims;
+using DnaKalip.Api.Services.Security;
 
 namespace DnaKalip.Api.Endpoints;
 
@@ -14,7 +16,8 @@ public static class ContractsEndpoints
     public static IEndpointRouteBuilder MapContractsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/contracts")
-            .RequireAuthorization(AuthPolicies.AuthenticatedUser)
+            .RequireAuthorization(Permissions.ContractsView)
+            .AddEndpointFilter<FinancialVisibilityFilter>()
             .WithTags("Contracts");
 
         group.MapGet("/number-suggestions", async (
@@ -54,6 +57,7 @@ public static class ContractsEndpoints
 
         group.MapGet(string.Empty, async (
             string? archiveStatus,
+            ClaimsPrincipal principal,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
@@ -68,6 +72,9 @@ public static class ContractsEndpoints
             }
 
             var query = db.Contracts.AsNoTracking();
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (!principal.IsInRole(AppRoles.Admin))
+                query = query.Where(c => c.WorkflowStatus == "active" || c.CreatedByUserId == userId || c.AssignedToUserId == userId);
 
             query = normalizedArchiveStatus switch
             {
@@ -99,7 +106,8 @@ public static class ContractsEndpoints
                     contract.Milestones.Count,
                     contract.Milestones.Count(milestone =>
                         milestone.PaymentTracking != null &&
-                        milestone.PaymentTracking.Status == PaymentStatuses.Paid)))
+                        milestone.PaymentTracking.Status == PaymentStatuses.Paid),
+                    contract.WorkflowStatus, contract.CreatedByUserId, contract.AssignedToUserId))
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(contracts);
@@ -108,10 +116,14 @@ public static class ContractsEndpoints
 
         group.MapGet("/{id:guid}", async (
             Guid id,
+            ClaimsPrincipal principal,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
             var contract = await GetContractDetailAsync(db, id, cancellationToken);
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (contract is not null && contract.WorkflowStatus != "active" && !principal.IsInRole(AppRoles.Admin) &&
+                contract.CreatedByUserId != userId && contract.AssignedToUserId != userId) return Results.NotFound();
 
             return contract is null
                 ? Results.NotFound()
@@ -121,11 +133,17 @@ public static class ContractsEndpoints
 
         group.MapPost(string.Empty, async (
             CreateContractRequest request,
+            ClaimsPrincipal principal,
+            AccessService access,
             DnaKalipDbContext db,
             ContractMilestoneSyncService milestoneSyncService,
             CancellationToken cancellationToken) =>
         {
+            var canFinance = principal.Has(Permissions.FinanceEdit);
+            if (!canFinance) request = request with { TotalAmount = 0, Currency = "EUR", FixedExchangeRate = null,
+                ExchangeRateType = null, FormDataJson = FinancialVisibility.TechnicalJson(request.FormDataJson), SaveAsDraft = true };
             var validationErrors = ValidateCreateContractRequest(request);
+            if (!request.SaveAsDraft && request.TotalAmount <= 0) validationErrors["totalAmount"] = ["Aktif sözleşme tutarı sıfırdan büyük olmalıdır."];
 
             if (validationErrors.Count > 0)
             {
@@ -191,6 +209,8 @@ public static class ContractsEndpoints
 
             var contract = new Contract
             {
+                WorkflowStatus = request.SaveAsDraft ? "draft" : "active",
+                CreatedByUserId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!),
                 ContractNumber = contractNumber,
                 FinanceTab = financeTab,
                 ContractType = NormalizeOptional(request.ContractType),
@@ -212,8 +232,12 @@ public static class ContractsEndpoints
             };
 
             milestoneSyncService.SyncFromFormData(contract);
+            if (contract.WorkflowStatus == "active" && (contract.Milestones.Count == 0 ||
+                Math.Abs(contract.Milestones.Sum(m => m.Amount) - contract.TotalAmount) > 0.05m))
+                return Results.BadRequest(new { message = "Aktif sözleşme için ödeme planının toplamı sözleşme bedeliyle eşleşmelidir." });
 
             db.Contracts.Add(contract);
+            access.Audit(principal, "contract.create", contract.Id, new { contract.WorkflowStatus });
             await db.SaveChangesAsync(cancellationToken);
 
             var createdContract = await GetContractDetailAsync(
@@ -223,15 +247,20 @@ public static class ContractsEndpoints
 
             return Results.Created($"/api/contracts/{contract.Id}", createdContract);
         })
-        .WithName("CreateContract");
+        .WithName("CreateContract").RequireAuthorization(Permissions.ContractsEdit);
 
         group.MapPut("/{id:guid}", async (
             Guid id,
             UpdateContractRequest request,
+            ClaimsPrincipal principal,
+            AccessService access,
             DnaKalipDbContext db,
             ContractMilestoneSyncService milestoneSyncService,
             CancellationToken cancellationToken) =>
         {
+            var canFinance = principal.Has(Permissions.FinanceEdit);
+            if (!canFinance) request = request with { TotalAmount = 0, Currency = "EUR", FixedExchangeRate = null,
+                ExchangeRateType = null, FormDataJson = FinancialVisibility.TechnicalJson(request.FormDataJson) };
             var validationErrors = ValidateUpdateContractRequest(request);
 
             if (validationErrors.Count > 0)
@@ -250,6 +279,17 @@ public static class ContractsEndpoints
             {
                 return Results.NotFound();
             }
+
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (contract.IsArchived) return Results.BadRequest(new { message = "Silinen sözleşme düzenlenemez." });
+            if (!principal.IsInRole(AppRoles.Admin) && contract.WorkflowStatus != "active" && contract.CreatedByUserId != userId && contract.AssignedToUserId != userId)
+                return Results.NotFound();
+            if (!canFinance && (contract.WorkflowStatus != "draft" || contract.CreatedByUserId != userId)) return Results.Forbid();
+            if (contract.WorkflowStatus == "pending" && !principal.IsInRole(AppRoles.Admin) && contract.AssignedToUserId != userId) return Results.Forbid();
+            if (request.Version != Convert.ToBase64String(contract.Version))
+                return Results.Conflict(new { message = "Sözleşme değişmiş. Yenileyip tekrar deneyin." });
+            if (contract.WorkflowStatus == "active" && request.TotalAmount <= 0)
+                return Results.BadRequest(new { message = "Aktif sözleşme tutarı sıfırdan büyük olmalıdır." });
 
             var contractNumber = request.ContractNumber.Trim();
             var financeTab = request.FinanceTab.Trim().ToLowerInvariant();
@@ -321,14 +361,41 @@ public static class ContractsEndpoints
             contract.ReferenceNumber = NormalizeOptional(request.ReferenceNumber);
             contract.PartName = NormalizeOptional(request.PartName);
             contract.MoldCount = request.MoldCount ?? 1;
-            contract.TotalAmount = request.TotalAmount;
-            contract.Currency = currency;
-            contract.ExchangeRateType = NormalizeOptional(request.ExchangeRateType);
-            contract.FixedExchangeRate = request.FixedExchangeRate;
-            contract.FormDataJson = NormalizeOptional(request.FormDataJson);
+            if (canFinance)
+            {
+                contract.TotalAmount = request.TotalAmount;
+                contract.Currency = currency;
+                contract.ExchangeRateType = NormalizeOptional(request.ExchangeRateType);
+                contract.FixedExchangeRate = request.FixedExchangeRate;
+                contract.FormDataJson = NormalizeOptional(request.FormDataJson);
+            }
+            else
+            {
+                // Preserve hidden financial fields when a returned draft is edited technically.
+                var existing = System.Text.Json.Nodes.JsonNode.Parse(contract.FormDataJson ?? "{}")!.AsObject();
+                var technical = System.Text.Json.Nodes.JsonNode.Parse(request.FormDataJson ?? "{}")!.AsObject();
+                foreach (var field in FinancialVisibility.TechnicalFields)
+                    if (technical.TryGetPropertyValue(field, out var value)) existing[field] = value?.DeepClone();
+                contract.FormDataJson = existing.ToJsonString();
+            }
 
-            milestoneSyncService.SyncFromFormData(contract);
-
+            if (canFinance)
+            {
+                var existingMilestoneIds = contract.Milestones.Select(m => m.Id).ToHashSet();
+                var existingTrackingIds = contract.Milestones.Where(m => m.PaymentTracking is not null)
+                    .Select(m => m.PaymentTracking!.Id).ToHashSet();
+                milestoneSyncService.SyncFromFormData(contract);
+                // New entities already have GUIDs. Mark them explicitly as inserts when added to a tracked graph.
+                foreach (var milestone in contract.Milestones)
+                {
+                    if (!existingMilestoneIds.Contains(milestone.Id)) db.ContractMilestones.Add(milestone);
+                    if (milestone.PaymentTracking is { } tracking && !existingTrackingIds.Contains(tracking.Id))
+                        db.PaymentTrackings.Add(tracking);
+                }
+            }
+            if (contract.WorkflowStatus == "active" && contract.Milestones.Count == 0)
+                return Results.BadRequest(new { message = "Aktif sözleşme için ödeme planı gereklidir." });
+            access.Audit(principal, "contract.update", contract.Id, new { contract.WorkflowStatus });
             await db.SaveChangesAsync(cancellationToken);
 
             var updatedContract = await GetContractDetailAsync(
@@ -338,10 +405,12 @@ public static class ContractsEndpoints
 
             return Results.Ok(updatedContract);
         })
-        .WithName("UpdateContract");
+        .WithName("UpdateContract").RequireAuthorization(Permissions.ContractsEdit);
 
         group.MapPatch("/{id:guid}/archive", async (
             Guid id,
+            ClaimsPrincipal principal,
+            AccessService access,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
@@ -355,20 +424,25 @@ public static class ContractsEndpoints
                 return Results.NotFound();
             }
 
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (contract.WorkflowStatus != "active" && !principal.IsInRole(AppRoles.Admin) &&
+                contract.CreatedByUserId != userId && contract.AssignedToUserId != userId) return Results.NotFound();
             if (!contract.IsArchived)
             {
                 contract.IsArchived = true;
                 contract.ArchivedAt = DateTimeOffset.UtcNow;
-
+                access.Audit(principal, "contract.archive", id, new { contract.WorkflowStatus });
                 await db.SaveChangesAsync(cancellationToken);
             }
 
             return Results.NoContent();
         })
-        .WithName("ArchiveContract");
+        .WithName("ArchiveContract").RequireAuthorization(Permissions.FinanceEdit);
 
         group.MapPatch("/{id:guid}/restore", async (
             Guid id,
+            ClaimsPrincipal principal,
+            AccessService access,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
@@ -382,17 +456,20 @@ public static class ContractsEndpoints
                 return Results.NotFound();
             }
 
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (contract.WorkflowStatus != "active" && !principal.IsInRole(AppRoles.Admin) &&
+                contract.CreatedByUserId != userId && contract.AssignedToUserId != userId) return Results.NotFound();
             if (contract.IsArchived)
             {
                 contract.IsArchived = false;
                 contract.ArchivedAt = null;
-
+                access.Audit(principal, "contract.restore", id, new { contract.WorkflowStatus });
                 await db.SaveChangesAsync(cancellationToken);
             }
 
             return Results.NoContent();
         })
-        .WithName("RestoreContract");
+        .WithName("RestoreContract").RequireAuthorization(Permissions.FinanceEdit);
 
         return app;
     }
@@ -456,7 +533,8 @@ public static class ContractsEndpoints
                                 milestone.PaymentTracking.PaymentDate,
                                 milestone.PaymentTracking.Status,
                                 milestone.PaymentTracking.DueDaysOverride)))
-                    .ToList()))
+                    .ToList(), contract.WorkflowStatus, contract.CreatedByUserId, contract.AssignedToUserId,
+                contract.ReturnReason, contract.Version))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

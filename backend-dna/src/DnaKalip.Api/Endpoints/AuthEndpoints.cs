@@ -36,6 +36,8 @@ public static class AuthEndpoints
             var user = await db.AppUsers
                 .Include(item => item.UserRoles)
                 .ThenInclude(userRole => userRole.Role)
+                .ThenInclude(role => role.Permissions)
+                .Include(item => item.PermissionOverrides)
                 .FirstOrDefaultAsync(
                     item => item.NormalizedEmail == normalizedEmail,
                     cancellationToken);
@@ -54,17 +56,7 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new(ClaimTypes.Name, user.FullName),
-                new(ClaimTypes.Email, user.Email),
-                new(ClaimTypes.Role, role.Name),
-            };
-            var identity = new ClaimsIdentity(
-                claims,
-                CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
+            var principal = AccessService.Principal(user);
 
             await httpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
@@ -104,6 +96,8 @@ public static class AuthEndpoints
                 .AsNoTracking()
                 .Include(item => item.UserRoles)
                 .ThenInclude(userRole => userRole.Role)
+                .ThenInclude(role => role.Permissions)
+                .Include(item => item.PermissionOverrides)
                 .FirstOrDefaultAsync(
                     item => item.Id == userId && item.IsActive,
                     cancellationToken);
@@ -147,7 +141,8 @@ public static class AuthEndpoints
             user.FullName,
             user.Email,
             role.Name,
-            role.DisplayName);
+            role.DisplayName,
+            AccessService.Effective(user));
     }
 
     private static AppRole? GetPrimaryRole(AppUser user)

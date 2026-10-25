@@ -142,3 +142,7 @@
     grid-template-columns: 1fr;
   }
 }
+.permission-fields { border: 1px solid #dbe2ea; border-radius: 8px; padding: 12px; margin: 12px 0; }
+.permission-fields label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.permission-fields select { max-width: 220px; }
+.permission-fields input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex-shrink: 0; }

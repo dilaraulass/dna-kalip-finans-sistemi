@@ -43,12 +43,30 @@ export function AuthProvider({ children }) {
     }
   }
 
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const current = await getCurrentUser({ signal: controller.signal });
+        if (controller.signal.aborted) return;
+        setUser((previous) => JSON.stringify(previous) === JSON.stringify(current) ? previous : current);
+      } catch (error) {
+        if (!controller.signal.aborted && error.status === 401) setUser(null);
+      }
+    };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => { controller.abort(); window.clearInterval(interval); window.removeEventListener("focus", refresh); };
+  }, [user]);
+
   const value = useMemo(
     () => ({
       user,
       loading,
       isAuthenticated: Boolean(user),
       isAdmin: user?.roleName === "Admin",
+      can: (permission) => user?.roleName === "Admin" || Boolean(user?.permissions?.includes(permission)),
       signIn,
       signOut,
     }),

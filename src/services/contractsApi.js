@@ -54,6 +54,13 @@ export function getContractById(id, { signal } = {}) {
   return request(`/contracts/${id}`, { signal });
 }
 
+export function getContractCompleters({ signal } = {}) { return request("/contracts/completers", { signal }); }
+export function changeContractWorkflow(id, action, payload) {
+  return request(`/contracts/${id}/workflow/${action}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+  });
+}
+
 export function getContractNumberSuggestions({ signal } = {}) {
   return request("/contracts/number-suggestions", { signal });
 }

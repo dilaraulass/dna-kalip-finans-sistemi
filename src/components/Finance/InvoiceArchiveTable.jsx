@@ -1,5 +1,6 @@
 import { CURRENCY_OPTIONS } from "../../constants/financeConstants";
 import { useState } from "react";
+import { useAuth } from "../../auth/useAuth";
 import { formatDate, sortRows } from "../../services/tableDisplay";
 import SortableHeader from "../ui/SortableHeader";
 import { formatMoney } from "../../services/financeService";
@@ -17,6 +18,7 @@ function InvoiceArchiveTable({
   onExportExcel,
 }) {
   const [sort, setSort] = useState({});
+  const { can } = useAuth();
   return (
     <>
       <div className="table-header">
@@ -37,7 +39,7 @@ function InvoiceArchiveTable({
             type="button"
             className="finance-primary-btn"
             onClick={() => onExportExcel(sortRows(rows, sort))}
-            disabled={rows.length === 0}
+            disabled={rows.length === 0 || !can("documents.export")}
           >
             Excel&apos;e Aktar
           </button>

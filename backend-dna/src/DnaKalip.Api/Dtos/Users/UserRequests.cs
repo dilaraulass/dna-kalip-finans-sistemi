@@ -5,11 +5,15 @@ public record CreateUserRequest(
     string? Email,
     string? Password,
     string? RoleName,
-    bool IsActive = true);
+    bool IsActive = true,
+    Dictionary<string, bool>? PermissionOverrides = null);
 
 public record UpdateUserRequest(
     string? FullName,
     string? Email,
     string? RoleName,
     bool IsActive,
-    string? NewPassword);
+    string? NewPassword,
+    Dictionary<string, bool>? PermissionOverrides = null);
+
+public record SaveRoleRequest(string DisplayName, string[] Permissions);

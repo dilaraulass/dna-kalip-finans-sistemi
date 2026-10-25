@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../../auth/useAuth";
 import { createCompany } from "../../services/companiesApi";
 import { getExpenseTypes, getCompanyExpenseDefaults } from "../../services/financeApi";
 import { formatDate } from "../../services/tableDisplay";
@@ -43,6 +44,7 @@ function ExpenseDetail({
   onArchive,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
+  const { can } = useAuth();
   const isCreateMode = mode === "create";
   const [expenseTypes, setExpenseTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(true);
@@ -205,12 +207,12 @@ function ExpenseDetail({
 
               <div>
                 <span>Fatura Kesildi</span>
-                <strong>{selectedRow.invoiceIssued ? "Evet" : "Hayır"}</strong>
+                <strong>{!can("finance.view") ? "***" : selectedRow.invoiceIssued ? "Evet" : "Hayır"}</strong>
               </div>
 
               <div>
                 <span>Fatura No</span>
-                <strong>{selectedRow.invoiceNumber || "-"}</strong>
+                <strong>{can("finance.view") ? selectedRow.invoiceNumber || "-" : "***"}</strong>
               </div>
             </div>
           </div>
@@ -275,7 +277,7 @@ function ExpenseDetail({
         </form>
       )}
 
-      <form className="finance-detail-section" onSubmit={handleSubmit}>
+      {can("expenses.edit") && <form className="finance-detail-section" onSubmit={handleSubmit}>
         <h3>{isCreateMode ? "Yeni Fatura Bilgisi" : "Fatura Bilgilerini Güncelle"}</h3>
 
         {error && <div className="finance-detail-error">{error}</div>}
@@ -445,7 +447,7 @@ function ExpenseDetail({
             </button>
           )}
         </div>
-      </form>
+      </form>}
     </div>
   );
 }

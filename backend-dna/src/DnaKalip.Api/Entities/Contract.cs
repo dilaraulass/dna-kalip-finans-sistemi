@@ -4,6 +4,11 @@ public class Contract
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string ContractNumber { get; set; } = string.Empty;
+    public string WorkflowStatus { get; set; } = "active";
+    public Guid? CreatedByUserId { get; set; }
+    public Guid? AssignedToUserId { get; set; }
+    public string? ReturnReason { get; set; }
+    public byte[] Version { get; set; } = [];
     public string FinanceTab { get; set; } = string.Empty;
     public string? ContractType { get; set; }
     public int? ContractYear { get; set; }

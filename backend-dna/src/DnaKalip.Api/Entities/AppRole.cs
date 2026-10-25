@@ -7,4 +7,5 @@ public class AppRole
     public string DisplayName { get; set; } = string.Empty;
 
     public ICollection<AppUserRole> UserRoles { get; set; } = [];
+    public ICollection<RolePermission> Permissions { get; set; } = [];
 }

@@ -23,7 +23,8 @@ public sealed record CreateContractRequest(
     string Currency,
     string? ExchangeRateType,
     decimal? FixedExchangeRate,
-    string? FormDataJson);
+    string? FormDataJson,
+    bool SaveAsDraft = false);
 
 public sealed record UpdateContractRequest(
     string ContractNumber,
@@ -48,4 +49,6 @@ public sealed record UpdateContractRequest(
     string Currency,
     string? ExchangeRateType,
     decimal? FixedExchangeRate,
-    string? FormDataJson);
+    string? FormDataJson,
+    bool SaveAsDraft = false,
+    string? Version = null);

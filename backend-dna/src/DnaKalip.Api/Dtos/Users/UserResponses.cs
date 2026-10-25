@@ -8,4 +8,6 @@ public record UserListItemResponse(
     string RoleDisplayName,
     bool IsActive,
     DateTime CreatedAt,
-    DateTime? UpdatedAt);
+    DateTime? UpdatedAt,
+    Dictionary<string, bool> PermissionOverrides,
+    string[] Permissions);

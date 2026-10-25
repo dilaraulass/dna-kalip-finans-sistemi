@@ -17,6 +17,10 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
     public DbSet<AppUserRole> AppUserRoles => Set<AppUserRole>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<AccessAudit> AccessAudits => Set<AccessAudit>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +38,10 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
 
         modelBuilder.Entity<Contract>(entity =>
         {
+            entity.Property(c => c.WorkflowStatus).HasMaxLength(20).HasDefaultValue("active");
+            entity.Property(c => c.ReturnReason).HasMaxLength(1000);
+            entity.Property(c => c.Version).IsRowVersion();
+            entity.HasIndex(c => new { c.WorkflowStatus, c.AssignedToUserId });
             entity.Property(contract => contract.ContractNumber).HasMaxLength(100).IsRequired();
             entity.Property(contract => contract.FinanceTab).HasMaxLength(25).IsRequired();
             entity.Property(contract => contract.ContractType).HasMaxLength(100);
@@ -193,6 +201,35 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
                 .WithMany(role => role.UserRoles)
                 .HasForeignKey(userRole => userRole.RoleId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.HasKey(p => new { p.RoleId, p.Code });
+            entity.Property(p => p.Code).HasMaxLength(80);
+            entity.HasOne(p => p.Role).WithMany(r => r.Permissions).HasForeignKey(p => p.RoleId);
+            entity.HasData(Permissions.Catalog.Keys.Select(code => new RolePermission
+            {
+                RoleId = Guid.Parse("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"), Code = code,
+            }));
+        });
+        modelBuilder.Entity<UserPermission>(entity =>
+        {
+            entity.HasKey(p => new { p.UserId, p.Code });
+            entity.Property(p => p.Code).HasMaxLength(80);
+            entity.HasOne(p => p.User).WithMany(u => u.PermissionOverrides).HasForeignKey(p => p.UserId);
+        });
+        modelBuilder.Entity<AccessAudit>(entity =>
+        {
+            entity.Property(a => a.Action).HasMaxLength(100);
+            entity.HasIndex(a => a.CreatedAt);
+        });
+        modelBuilder.Entity<UserNotification>(entity =>
+        {
+            entity.Property(n => n.Message).HasMaxLength(500);
+            entity.HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Contract>().WithMany().HasForeignKey(n => n.ContractId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

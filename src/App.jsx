@@ -5,6 +5,7 @@ import Companies from "./pages/Companies";
 import PaymentTracking from "./pages/PaymentTracking";
 import Login from "./pages/Login";
 import Users from "./pages/Users";
+import Notifications from "./components/Notifications";
 import logo from "./assets/logo.png";
 import { FaBuilding, FaFileContract, FaUsers } from "react-icons/fa";
 import { FaMoneyBillTrendUp } from "react-icons/fa6";
@@ -16,7 +17,7 @@ import "./App.css";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { user, loading, isAdmin, signOut } = useAuth();
+  const { user, loading, isAdmin, signOut, can } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -67,10 +68,10 @@ function App() {
             {sidebarOpen && <span>Finans</span>}
           </NavLink>
 
-          <NavLink to="/contracts" className="menu-item" data-label="Sözleşmeler">
+          {can("contracts.view") && <NavLink to="/contracts" className="menu-item" data-label="Sözleşmeler">
             <FaFileContract size={20} />
             {sidebarOpen && <span>Sözleşmeler</span>}
-          </NavLink>
+          </NavLink>}
 
           <NavLink to="/companies" className="menu-item" data-label="Firmalar">
             <FaBuilding size={20} />
@@ -107,17 +108,18 @@ function App() {
         </div>
       </aside>
 
-      <main className="content">
+      <main className="content" key={`${user.id}:${user.permissions?.join(",")}`}>
         <header className="topbar">
           <div className="topbar-title">
             DNA Kalıp Finans ve Sözleşme Sistemi
           </div>
+          <Notifications />
         </header>
 
         <Routes>
           <Route path="/" element={<Navigate to="/finance" replace />} />
           <Route path="/finance" element={<Finance />} />
-          <Route path="/contracts" element={<Contracts />} />
+          <Route path="/contracts" element={can("contracts.view") ? <Contracts /> : <p>Sözleşme görüntüleme yetkiniz yok.</p>} />
           <Route path="/companies" element={<Companies />} />
           <Route path="/payments" element={<PaymentTracking />} />
           {isAdmin && <Route path="/users" element={<Users />} />}

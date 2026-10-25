@@ -5,4 +5,5 @@ public record CurrentUserResponse(
     string FullName,
     string Email,
     string RoleName,
-    string RoleDisplayName);
+    string RoleDisplayName,
+    string[] Permissions);

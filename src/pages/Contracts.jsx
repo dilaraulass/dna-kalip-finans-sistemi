@@ -2,6 +2,9 @@ import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { useEffect, useMemo, useState } from "react";
 import { FiPrinter } from "react-icons/fi";
+import { useLocation } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
+import ContractWorkflow from "../components/ContractWorkflow";
 import Drawer from "../components/Drawer/Drawer";
 import {
   archiveContract,
@@ -370,6 +373,7 @@ const CUSTOMER_SINGLE_PAYMENT_DEFAULTS = [
 ];
 
 function formatMoney(amount, currency) {
+  if (amount === null || amount === undefined) return "***";
   return `${currencyFormatter.format(amount ?? 0)} ${currency || ""}`.trim();
 }
 
@@ -696,6 +700,10 @@ function buildContractPayload(form) {
 }
 
 function ContractsPage() {
+  const { can } = useAuth();
+  const location = useLocation();
+  const [saveAsDraft, setSaveAsDraft] = useState(false);
+  const [workflowFilter, setWorkflowFilter] = useState("all");
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -722,6 +730,16 @@ function ContractsPage() {
   const [archiveError, setArchiveError] = useState("");
   const [archiveSubmitting, setArchiveSubmitting] = useState(false);
   const [companyOptions, setCompanyOptions] = useState([]);
+
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("contractId");
+    if (!id) return;
+    const controller = new AbortController();
+    getContractById(id, { signal: controller.signal }).then(detail => {
+      setSelectedContractId(id); setSelectedContract(detail); setDetailError("");
+    }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+    return () => controller.abort();
+  }, [location.search]);
 
   async function openContractDetail(contractId) {
     setSelectedContractId(contractId);
@@ -813,9 +831,9 @@ function ContractsPage() {
             value.toLocaleLowerCase("tr-TR").includes(search),
           );
 
-      return matchesFinanceTab && matchesSearch;
+      return matchesFinanceTab && matchesSearch && (workflowFilter === "all" || contract.workflowStatus === workflowFilter);
     });
-  }, [contracts, financeTabFilter, searchText]);
+  }, [contracts, financeTabFilter, searchText, workflowFilter]);
 
   const summary = useMemo(
     () => ({
@@ -844,6 +862,8 @@ function ContractsPage() {
 
   const columns = useMemo(() => {
     const baseColumns = [
+      { field: "workflowStatus", headerName: "Süreç", width: 190,
+        valueFormatter: value => ({ active: "Aktif", draft: "Taslak", pending: "Tamamlanmayı bekliyor" }[value] || value) },
       {
         field: "contractNumber",
         headerName: "Sözleşme No",
@@ -933,6 +953,8 @@ function ContractsPage() {
   }
 
   async function openCreateDrawer() {
+    if (!can("contracts.edit")) return;
+    setSaveAsDraft(!can("finance.edit"));
     if (numberSuggestionsLoading) return;
     setCreateForm(INITIAL_CONTRACT_FORM);
     setCreateError("");
@@ -1008,7 +1030,7 @@ function ContractsPage() {
     const customerPaymentRateTotal = getCustomerPaymentRateTotal(createForm);
 
     if (
-      createForm.financeTab === "musteri" &&
+      can("finance.edit") && !saveAsDraft && createForm.financeTab === "musteri" &&
       customerPaymentRateTotal !== 100
     ) {
       setCreateError(
@@ -1020,6 +1042,7 @@ function ContractsPage() {
     setCreateSubmitting(true);
 
     const payload = buildContractPayload(createForm);
+    payload.saveAsDraft = saveAsDraft || !can("finance.edit");
 
     try {
       const createdContract = await createContract(payload);
@@ -1050,7 +1073,7 @@ function ContractsPage() {
     const customerPaymentRateTotal = getCustomerPaymentRateTotal(editForm);
 
     if (
-      editForm.financeTab === "musteri" &&
+      can("finance.edit") && selectedContract.workflowStatus === "active" && editForm.financeTab === "musteri" &&
       customerPaymentRateTotal !== 100
     ) {
       setEditError(
@@ -1062,6 +1085,7 @@ function ContractsPage() {
     setEditSubmitting(true);
 
     const payload = buildContractPayload(editForm);
+    payload.version = selectedContract.version;
 
     try {
       const updatedContract = await updateContract(selectedContract.id, payload);
@@ -1202,7 +1226,7 @@ function ContractsPage() {
               type="button"
               className="contracts-primary-btn"
               onClick={openCreateDrawer}
-              disabled={numberSuggestionsLoading}
+              disabled={numberSuggestionsLoading || !can("contracts.edit")}
             >
               {numberSuggestionsLoading ? "Numara hazırlanıyor..." : "Yeni Sözleşme"}
             </button>
@@ -1223,6 +1247,10 @@ function ContractsPage() {
               <option value="all">Tümü</option>
               <option value="musteri">Müşteri</option>
               <option value="tedarikci">Tedarikçi</option>
+            </select>
+            <select className="contracts-filter" aria-label="Sözleşme süreci" value={workflowFilter} onChange={e => setWorkflowFilter(e.target.value)}>
+              <option value="all">Tüm süreçler</option><option value="active">Aktif sözleşmeler</option>
+              <option value="draft">Taslaklar</option><option value="pending">Tamamlanmayı Bekleyenler</option>
             </select>
           </div>
         </div>
@@ -1285,6 +1313,11 @@ function ContractsPage() {
         )}
 
         {!detailLoading && selectedContract && (
+          <>
+          <ContractWorkflow key={selectedContract.id} contract={selectedContract} onUpdated={async () => {
+            await openContractDetail(selectedContract.id);
+            setContracts(await getContracts({ archiveStatus: contractArchiveStatus }));
+          }} />
           <ContractDetail
             contract={selectedContract}
             onPreview={openPreviewDrawer}
@@ -1294,6 +1327,7 @@ function ContractsPage() {
             archiveSubmitting={archiveSubmitting}
             isArchived={selectedContract.isArchived}
           />
+          </>
         )}
       </Drawer>
 
@@ -1303,7 +1337,7 @@ function ContractsPage() {
         width={980}
         hideHeader
         actions={
-          selectedContract && (
+          selectedContract && can("documents.export") && (
             <button
               type="button"
               className="contract-preview-print-btn"
@@ -1350,13 +1384,15 @@ function ContractsPage() {
       >
         <CreateContractForm
           form={createForm}
+          saveAsDraft={saveAsDraft}
+          onDraftChange={setSaveAsDraft}
           companyOptions={companyOptions}
           error={createError}
           submitting={createSubmitting}
           onChange={handleCreateFormChange}
           onSubmit={handleCreateSubmit}
           onCancel={closeCreateDrawer}
-          submitLabel="Sözleşme Oluştur"
+          submitLabel={saveAsDraft || !can("finance.edit") ? "Taslak Kaydet" : "Oluştur ve Aktifleştir"}
         />
       </Drawer>
     </section>
@@ -1364,6 +1400,8 @@ function ContractsPage() {
 }
 
 function CreateContractForm({
+  saveAsDraft,
+  onDraftChange,
   form,
   companyOptions = [],
   error,
@@ -1374,6 +1412,7 @@ function CreateContractForm({
   readOnly = false,
   submitLabel = "Sözleşme Oluştur",
 }) {
+  const { can } = useAuth();
   const activeTemplate = CONTRACT_EDITOR_CONFIG[form.financeTab];
   const contractTypeOptions = getContractTypeOptions(form.financeTab);
   const totalPages = form.financeTab === "tedarikci" ? 4 : 2;
@@ -1460,6 +1499,10 @@ function CreateContractForm({
       onSubmit={onSubmit}
     >
       {error && <div className="contracts-status error">{error}</div>}
+      {!readOnly && !can("finance.edit") && <p>Teknik bilgileri taslak olarak kaydedebilirsiniz. Finansal alanları yetkili kişi tamamlar.</p>}
+      {!readOnly && onDraftChange && can("finance.edit") && <label>
+        <input type="checkbox" checked={saveAsDraft} onChange={e => onDraftChange(e.target.checked)} /> Taslak olarak kaydet (finansa dahil edilmez)
+      </label>}
 
       <div className="contract-editor-tabs">
         {Object.entries(CONTRACT_EDITOR_CONFIG).map(([financeTab, config]) => (
@@ -1721,11 +1764,11 @@ function CreateContractForm({
                   rows={DELIVERY_PLAN_ROWS}
                   onNestedChange={handleNestedFormChange}
                 />
-              <SupplierPaymentTermsSection
+              <fieldset disabled={!can("finance.edit")} className="contract-financial-fields"><SupplierPaymentTermsSection
                 form={form}
                 onChange={onChange}
                 onNestedChange={handleNestedFormChange}
-              />
+              /></fieldset>
             </A4Page>
 
             <A4Page financeTab={form.financeTab} pageNum={4} totalPages={4}>
@@ -1743,7 +1786,7 @@ function CreateContractForm({
                   rows={CUSTOMER_DELIVERY_PLAN_ROWS}
                   onNestedChange={handleNestedFormChange}
                 />
-                <CustomerPaymentTermsSection form={form} onChange={onChange} />
+                <fieldset disabled={!can("finance.edit")} className="contract-financial-fields"><CustomerPaymentTermsSection form={form} onChange={onChange} /></fieldset>
                 <CustomerSignatureSection form={form} />
           </A4Page>
         )}
@@ -2042,6 +2085,8 @@ function DeliveryPlanSection({ form, onChange, title, rows, onNestedChange }) {
 }
 
 function SupplierPaymentTermsSection({ form, onChange, onNestedChange }) {
+  const { can } = useAuth();
+  if (!can("finance.view")) return <section className="contract-document-section"><h3>Bedel ve Ödeme Planı</h3><p>***</p></section>;
   const totalInWords = formatAmountInWords(form.totalAmount, form.currency);
 
   return (
@@ -2249,6 +2294,8 @@ function SupplierPaymentOption({
 }
 
 function CustomerPaymentTermsSection({ form, onChange }) {
+  const { can } = useAuth();
+  if (!can("finance.view")) return <section className="contract-document-section"><h3>Bedel ve Ödeme Planı</h3><p>***</p></section>;
   const rows = CUSTOMER_PAYMENT_FIELDS.map(
     ([rateField, conditionField, dueDaysField], index) => [
       rateField,
@@ -2587,6 +2634,10 @@ function ContractDetail({
   archiveSubmitting,
   isArchived,
 }) {
+  const { can, user, isAdmin } = useAuth();
+  const canEdit = can("contracts.edit") && (isAdmin || (contract.workflowStatus === "active" ? can("finance.edit")
+    : contract.workflowStatus === "pending" ? can("finance.edit") && contract.assignedToUserId === user.id
+    : contract.createdByUserId === user.id || (can("finance.edit") && contract.assignedToUserId === user.id)));
   return (
     <div className="contract-detail">
       <div className="contract-detail-actions">
@@ -2596,7 +2647,7 @@ function ContractDetail({
               type="button"
               className="contracts-danger-btn"
               onClick={onArchive}
-              disabled={archiveSubmitting}
+              disabled={archiveSubmitting || !can("finance.edit")}
             >
               {archiveSubmitting ? "Taşınıyor..." : "Silinenlere Taşı"}
             </button>
@@ -2604,6 +2655,7 @@ function ContractDetail({
               type="button"
               className="contracts-secondary-btn"
               onClick={onEdit}
+              disabled={!canEdit}
             >
               Düzenle
             </button>
@@ -2614,7 +2666,7 @@ function ContractDetail({
             type="button"
             className="contracts-secondary-btn"
             onClick={onRestore}
-            disabled={archiveSubmitting}
+            disabled={archiveSubmitting || !can("finance.edit")}
           >
             {archiveSubmitting ? "Geri alınıyor..." : "Silinenlerden Çıkar"}
           </button>
@@ -2669,7 +2721,7 @@ function ContractDetail({
                 <span>{formatMoney(milestone.amount, contract.currency)}</span>
               </header>
               <p>Takip anahtarı: {milestone.trackingKey}</p>
-              <p>Oran: %{currencyFormatter.format(milestone.rate ?? 0)}</p>
+              <p>Oran: {can("finance.view") ? `%${currencyFormatter.format(milestone.rate ?? 0)}` : "***"}</p>
               <p>Vade: {milestone.dueDays} gün</p>
               <p>
                 Durum:{" "}

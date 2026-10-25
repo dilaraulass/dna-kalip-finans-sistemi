@@ -1,4 +1,5 @@
 import { ALL_FILTER_VALUE } from "../../constants/financeConstants";
+import { useAuth } from "../../auth/useAuth";
 import { formatMoney } from "../../services/financeService";
 
 function FinanceStatusCards({
@@ -11,6 +12,7 @@ function FinanceStatusCards({
   expenseModule,
   transactionLabel,
 }) {
+  const { can } = useAuth();
   return (
     <div className="stats-grid">
       {Object.entries(statusFilters).map(([key, label]) => (
@@ -29,7 +31,7 @@ function FinanceStatusCards({
                 : `Toplam ${transactionLabel}`
               : label}
           </h3>
-          {mixedCurrencies ? (
+          {!can("finance.view") ? <p>***</p> : mixedCurrencies ? (
             typeof activeStats[key] === "object"
               ? Object.entries(activeStats[key]).sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => (
                 <p key={currency}>{formatMoney(amount, currency)}</p>

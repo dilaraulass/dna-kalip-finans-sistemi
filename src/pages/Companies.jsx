@@ -9,6 +9,7 @@ import {
   updateCompany,
 } from "../services/companiesApi";
 import "./Companies.css";
+import { useAuth } from "../auth/useAuth";
 
 const COMPANY_TYPES = {
   all: "all",
@@ -60,6 +61,7 @@ function formatDate(value) {
 }
 
 function formatMoney(amount, currency) {
+  if (amount === null) return "***";
   return `${currencyFormatter.format(amount ?? 0)} ${currency || ""}`.trim();
 }
 
@@ -84,6 +86,7 @@ function buildCompanyForm(company) {
 }
 
 function CompaniesPage() {
+  const { can } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -349,6 +352,7 @@ function CompaniesPage() {
               type="button"
               className="companies-primary-btn"
               onClick={openCreateDrawer}
+              disabled={!can("contracts.edit") && !can("expenses.edit")}
             >
               Yeni Firma
             </button>
@@ -421,6 +425,7 @@ function CompaniesPage() {
 }
 
 function CompanyDetail({ company, onEdit }) {
+  const { can } = useAuth();
   return (
     <div className="company-detail">
       <div className="company-detail-actions">
@@ -428,6 +433,7 @@ function CompanyDetail({ company, onEdit }) {
           type="button"
           className="companies-secondary-btn"
           onClick={() => onEdit(company)}
+          disabled={!can("contracts.edit") && !can("expenses.edit")}
         >
           Düzenle
         </button>

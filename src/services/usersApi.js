@@ -41,6 +41,14 @@ export function getUsers({ signal } = {}) {
   return request("/users", { signal });
 }
 
+export function getRoles({ signal } = {}) { return request("/roles", { signal }); }
+export function saveRole(id, payload) {
+  return request(id ? `/roles/${id}` : "/roles", {
+    method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+  });
+}
+export function getAccessAudit() { return request("/users/audit"); }
+
 export function createUser(payload, { signal } = {}) {
   return request("/users", {
     method: "POST",

@@ -300,3 +300,9 @@
     font-size: 17px;
   }
 }
+.notifications { position: relative; margin-left: auto; font-size: 14px; }
+.notifications summary { cursor: pointer; padding: 10px; }
+.notifications-panel { position: absolute; right: 0; z-index: 40; width: min(400px, 80vw); max-height: 65vh; overflow: auto; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; box-shadow: 0 8px 28px #0002; }
+.notifications-panel ul { padding-left: 20px; }
+.notifications-panel li { margin: 12px 0; }
+.notifications-panel small { display: block; color: #64748b; }

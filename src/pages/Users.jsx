@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
-import { createUser, getUsers, updateUser } from "../services/usersApi";
+import { createUser, getUsers, updateUser, getRoles, getAccessAudit } from "../services/usersApi";
+import PermissionFields from "../components/PermissionFields";
+import RoleEditor from "../components/RoleEditor";
 import "./Users.css";
 
 const EMPTY_USER_FORM = {
@@ -11,6 +13,7 @@ const EMPTY_USER_FORM = {
   newPassword: "",
   roleName: "Accounting",
   isActive: true,
+  permissionOverrides: {},
 };
 
 const ROLE_LABELS = {
@@ -19,6 +22,9 @@ const ROLE_LABELS = {
 };
 
 function Users() {
+  const [roleData, setRoleData] = useState({ roles: [], permissions: [] });
+  const [roleEditor, setRoleEditor] = useState(null);
+  const [audit, setAudit] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +38,8 @@ function Users() {
     setError("");
 
     try {
-      const data = await getUsers({ signal });
+      const [data, roles] = await Promise.all([getUsers({ signal }), getRoles({ signal })]);
+      setRoleData(roles);
       setUsers(data);
     } catch (requestError) {
       if (requestError.name !== "AbortError") {
@@ -65,7 +72,7 @@ function Users() {
         field: "roleName",
         headerName: "Rol",
         width: 140,
-        valueFormatter: (value) => ROLE_LABELS[value] || value,
+        valueFormatter: (value) => roleData.roles.find(r => r.name === value)?.displayName || ROLE_LABELS[value] || value,
       },
       {
         field: "isActive",
@@ -74,7 +81,7 @@ function Users() {
         valueFormatter: (value) => (value ? "Aktif" : "Pasif"),
       },
     ],
-    [],
+    [roleData.roles],
   );
 
   function resetForm() {
@@ -92,6 +99,7 @@ function Users() {
       newPassword: "",
       roleName: params.row.roleName || "Accounting",
       isActive: Boolean(params.row.isActive),
+      permissionOverrides: params.row.permissionOverrides || {},
     });
     setFormError("");
   }
@@ -102,6 +110,7 @@ function Users() {
     setForm((currentForm) => ({
       ...currentForm,
       [name]: type === "checkbox" ? checked : value,
+      ...(name === "roleName" ? { permissionOverrides: {} } : {}),
     }));
   }
 
@@ -119,12 +128,14 @@ function Users() {
           roleName: form.roleName,
           isActive: form.isActive,
           newPassword: form.newPassword.trim() || null,
+          permissionOverrides: form.permissionOverrides,
         });
       } else {
         await createUser({
           fullName: form.fullName.trim(),
           email: form.email.trim(),
           password: form.password,
+          permissionOverrides: form.permissionOverrides,
           roleName: form.roleName,
           isActive: form.isActive,
         });
@@ -197,10 +208,18 @@ function Users() {
             <label>
               <span>Rol</span>
               <select name="roleName" value={form.roleName} onChange={handleChange}>
-                <option value="Accounting">Muhasebe</option>
-                <option value="Admin">Admin</option>
+                {roleData.roles.map(role => <option key={role.id} value={role.name}>{role.displayName}</option>)}
               </select>
             </label>
+            <div className="users-form-actions">
+              <button type="button" onClick={() => setRoleEditor({})}>+ Yeni Rol</button>
+              {form.roleName !== "Admin" && <button type="button" onClick={() => setRoleEditor(roleData.roles.find(r => r.name === form.roleName))}>Rolü Düzenle</button>}
+            </div>
+            {form.roleName === "Admin" ? <p>Admin tüm yetkilere sahiptir.</p> :
+              <PermissionFields catalog={roleData.permissions}
+                rolePermissions={roleData.roles.find(r => r.name === form.roleName)?.permissions || []}
+                overrides={form.permissionOverrides} disabled={submitting}
+                onChange={permissionOverrides => setForm(current => ({ ...current, permissionOverrides }))} />}
 
             <label className="users-checkbox">
               <input
@@ -251,6 +270,20 @@ function Users() {
           </form>
         </section>
       </div>
+      {roleEditor && <RoleEditor key={roleEditor.id || "new"} role={roleEditor.id ? roleEditor : null}
+        catalog={roleData.permissions} onClose={() => setRoleEditor(null)} onSaved={async (created) => {
+          setRoleEditor(null); await loadUsers();
+          if (created) setForm(current => ({ ...current, roleName: created.name, permissionOverrides: {} }));
+        }} />}
+      <section className="users-list-card">
+        <button type="button" onClick={async () => {
+          try { setAudit(await getAccessAudit()); } catch (error) { setError(error.message); }
+        }}>Son Yetki ve İşlem Kayıtlarını Göster</button>
+        {audit && <ul>{audit.map(item => <li key={item.id}>
+          {new Date(item.createdAt).toLocaleString("tr-TR")} — {users.find(u => u.id === item.actorId)?.fullName || item.actorId} — {item.action}
+          <details><summary>Ayrıntı</summary><pre>{item.details}</pre></details>
+        </li>)}</ul>}
+      </section>
     </div>
   );
 }

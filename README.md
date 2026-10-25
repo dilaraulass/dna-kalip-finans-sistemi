@@ -215,9 +215,48 @@ PUT    /api/companies/{id}
 
 ## Production Öncesi Yapılacaklar
 
-- Login ve yetkilendirme
+- Yetki ve taslak akışının hedef ortamda kullanıcı kabul testi
 - Production connection string ve secret yönetimi
 - Seed endpointinin production’da kapalı olduğunun doğrulanması
 - Backup stratejisi
 - Hata loglama ve izleme
 - Deployment dokümantasyonu
+
+## Kullanıcı Yetkileri ve Sözleşme Tamamlama
+
+- Admin yeni rol tanımlar; rolün izinlerini kullanıcıya özel izin/engel ile değiştirebilir. Kullanıcıdaki “Rolünden” seçeneği rolün güncel ayarını izler.
+- Mevcut Muhasebe rolünün hakları migration ile korunur; Admin tüm yetkilere sahiptir. Son aktif admin pasifleştirilemez.
+- Sözleşme hazırlama ve finansal düzenleme yetkisi olan kişi doğrudan aktif sözleşme oluşturabilir veya taslak kaydedebilir.
+- Sadece hazırlama yetkisi olan kişi teknik taslak oluşturur, finans yetkilisini seçip tamamlamaya gönderir. Sorumlu kişi uygulama içi bildirim alır; finansal alanları kaydedip aktifleştirir veya açıklamayla iade eder. E-posta gönderilmez.
+- Taslak/bekleyen kayıtlar finans hesaplarına girmez. Bu kayıtları yalnızca hazırlayan, atanan kişi ve admin görüntüler. Mevcut sözleşmeler migration sonrasında aktif kalır.
+- Finans görüntüleme izni olmayan kullanıcıya tutarlar API'de `null`, ekranda `***` döner. Belgenin `FormDataJson` alanı yalnızca izinli teknik alanları içerir. Yeni teknik alan eklenirse sunucu allowlist'i de güncellenmelidir.
+- Çıktı yetkisi uygulamadaki Excel/PDF düğmelerini kontrol eder; tarayıcının kendi yazdırma ve ekran görüntüsü özelliklerini engellemez. Gizli tutarlar zaten istemciye gönderilmez.
+- Yetkiler her API isteğinde yeniden okunur. Arayüz 30 saniyede bir ve pencereye dönüşte izinleri yeniler. Yetki değişiklikleri/iş akışı adımları adminin işlem kayıtlarında görünür.
+- Sözleşme güncellemesi ve iş akışı istekleri detay yanıtındaki `version` değerini göndermelidir; eski sürüm için `409` dönülür.
+
+### Kurulum / güncelleme sırası
+
+Bu değişiklik, `AddPermissionsAndContractWorkflow` migration'ını gerektirir. Kullanılan connection string'i kontrol edin; gerçek veride yedek aldıktan sonra backend'i durdurup migration uygulayın:
+
+```powershell
+dotnet ef database update --project backend-dna/src/DnaKalip.Api/DnaKalip.Api.csproj --configuration Release
+```
+
+Ardından backend'i yeniden başlatın ve frontend'i yenileyin/yeniden yayınlayın. Yeni API'yi eski şemayla çalıştırmayın. Bu migration rol/kullanıcı izinleri, işlem kayıtları ve bildirim tablolarını; sözleşmelere durum, sorumlu ve sürüm alanlarını ekler.
+
+### Tekrarlanabilir kontroller
+
+```powershell
+npm run lint
+npm test
+npm run build
+dotnet run --project backend-dna/tests/DnaKalip.SecurityChecks/DnaKalip.SecurityChecks.csproj --configuration Release
+```
+
+Gerçek API + SQL testi ayrı, rastgele isimli `DnaKalip_SecurityCheck_*` veritabanı oluşturur ve sonunda yalnızca bu veritabanını siler. Test kullanıcısının veritabanı oluşturma/silme yetkisi gerekir; uygulamanın veritabanına bağlanmaz. Varsayılan sunucu `localhost\SQL2022`, isteğe bağlı argüman `--server=SUNUCU`:
+
+```powershell
+dotnet run --project backend-dna/tests/DnaKalip.SecurityChecks/DnaKalip.SecurityChecks.csproj --configuration Release -- --integration
+```
+
+Manuel kabul: Teknik kullanıcıyla taslak hazırlayıp bir finans yetkilisine gönderin. Yetkili hesaptan bildirimi açıp bedel/ödeme planını kaydedin, aktifleştirin. Teknik kullanıcıda tutarların `***`, finans yetkilisinde gerçek değer olduğunu kontrol edin. Adminin kullanıcıya finans görüntüleme hakkını kaldırmasının sonraki API isteğinde etkili olduğunu doğrulayın.

@@ -5,6 +5,8 @@ using DnaKalip.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Xml.Linq;
+using System.Security.Claims;
+using DnaKalip.Api.Services.Security;
 
 namespace DnaKalip.Api.Endpoints;
 
@@ -17,6 +19,7 @@ public static class FinanceEndpoints
     {
         var group = app.MapGroup("/api/finance")
             .RequireAuthorization(AuthPolicies.AuthenticatedUser)
+            .AddEndpointFilter<FinancialVisibilityFilter>()
             .WithTags("Finance");
 
         group.MapGet("/expense-types", async (DnaKalipDbContext db, CancellationToken cancellationToken) =>
@@ -43,7 +46,7 @@ public static class FinanceEndpoints
 
             var paymentMilestones = await db.ContractMilestones
                 .AsNoTracking()
-                .Where(milestone => !milestone.Contract.IsArchived)
+                .Where(milestone => !milestone.Contract.IsArchived && milestone.Contract.WorkflowStatus == "active")
                 .OrderBy(milestone => milestone.Contract.ContractDate)
                 .ThenBy(milestone => milestone.Contract.ContractNumber)
                 .ThenBy(milestone => milestone.SortOrder)
@@ -262,7 +265,7 @@ public static class FinanceEndpoints
 
             return Results.Ok(rates);
         })
-        .WithName("GetExchangeRates");
+        .WithName("GetExchangeRates").RequireAuthorization(Permissions.FinanceView);
 
         group.MapGet("/exchange-rates/live", async (
             HttpClient httpClient,
@@ -307,7 +310,7 @@ public static class FinanceEndpoints
                     statusCode: StatusCodes.Status502BadGateway);
             }
         })
-        .WithName("GetLiveExchangeRates");
+        .WithName("GetLiveExchangeRates").RequireAuthorization(Permissions.ExpensesEdit);
 
         group.MapPut("/exchange-rates/{currency}", async (
             string currency,
@@ -357,11 +360,12 @@ public static class FinanceEndpoints
                 exchangeRate.EffectiveDate,
                 exchangeRate.CreatedAt));
         })
-        .WithName("UpsertExchangeRate");
+        .WithName("UpsertExchangeRate").RequireAuthorization(Permissions.ExpensesEdit);
 
         app.MapPut("/api/contract-milestones/{milestoneId:guid}/payment-tracking", async (
             Guid milestoneId,
             UpdatePaymentTrackingRequest request,
+            ClaimsPrincipal principal,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
@@ -387,6 +391,13 @@ public static class FinanceEndpoints
                 .FirstOrDefaultAsync(
                     item => item.ContractMilestoneId == milestoneId,
                     cancellationToken);
+
+            if (milestone.Contract.IsArchived || milestone.Contract.WorkflowStatus != "active") return Results.Forbid();
+            if (!principal.Has(Permissions.MilestonesApprove) &&
+                (request.ApprovalDate != paymentTracking?.ApprovalDate || request.DueDaysOverride != paymentTracking?.DueDaysOverride)) return Results.Forbid();
+            if (!principal.Has(Permissions.PaymentsEdit) &&
+                (request.PaymentDate != paymentTracking?.PaymentDate || request.Status != (paymentTracking?.Status ?? PaymentStatuses.Pending) || request.InvoiceIssued.HasValue)) return Results.Forbid();
+            if (!principal.Has(Permissions.MilestonesApprove) && !principal.Has(Permissions.PaymentsEdit)) return Results.Forbid();
 
             if (paymentTracking is null)
             {
@@ -481,7 +492,7 @@ public static class FinanceEndpoints
         })
         .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
-        .WithName("CreateExpenseInvoice");
+        .WithName("CreateExpenseInvoice").RequireAuthorization(Permissions.ExpensesEdit);
 
         app.MapPut("/api/expense-invoices/{id:guid}", async (
             Guid id,
@@ -549,7 +560,7 @@ public static class FinanceEndpoints
         })
         .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
-        .WithName("UpdateExpenseInvoice");
+        .WithName("UpdateExpenseInvoice").RequireAuthorization(Permissions.ExpensesEdit);
 
         app.MapPatch("/api/expense-invoices/{id:guid}/archive", async (
             Guid id,
@@ -578,7 +589,7 @@ public static class FinanceEndpoints
         })
         .RequireAuthorization(AuthPolicies.AuthenticatedUser)
         .WithTags("Finance")
-        .WithName("ArchiveExpenseInvoice");
+        .WithName("ArchiveExpenseInvoice").RequireAuthorization(Permissions.ExpensesEdit);
 
         return app;
     }

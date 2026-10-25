@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useAuth } from "../../auth/useAuth";
 import { formatDate, sortRows } from "../../services/tableDisplay";
 import SortableHeader from "../ui/SortableHeader";
 import {
@@ -36,6 +37,7 @@ function PaymentMilestoneTable({
   onInvoiceInlineValidationError,
 }) {
   const [invoiceDrafts, setInvoiceDrafts] = useState({});
+  const { can } = useAuth();
   const [sort, setSort] = useState({});
   const [savingRowIds, setSavingRowIds] = useState({});
   const [editingCell, setEditingCell] = useState(null);
@@ -137,7 +139,9 @@ function PaymentMilestoneTable({
   }
 
   function renderEditableCell(row, field, label, displayValue, editorType) {
-    const isEditable = activeTab === FINANCE_MODULES.supplier;
+    const isEditable = activeTab === FINANCE_MODULES.supplier && can(
+      ["approvalDate", "activeDueDays"].includes(field) ? "milestones.approve" : "payments.edit",
+    );
     const isEditing =
       editingCell?.rowId === row.id && editingCell?.field === field;
     const isSaving = Boolean(savingRowIds[row.id]);
@@ -271,6 +275,8 @@ function PaymentMilestoneTable({
   }, [rows, sort]);
 
   function renderInvoiceIssuedCell(row) {
+    if (!can("finance.view")) return "***";
+    if (!can("payments.edit")) return row.invoiceIssued ? "Evet" : "Hayır";
     const draft = getInvoiceDraft(row);
     const isSaving = Boolean(savingRowIds[row.contractId || row.contractNumber]);
 
@@ -298,6 +304,8 @@ function PaymentMilestoneTable({
   }
 
   function renderInvoiceNumberCell(row) {
+    if (!can("finance.view")) return "***";
+    if (!can("payments.edit")) return row.invoiceNumber || "—";
     const draft = getInvoiceDraft(row);
     const isSaving = Boolean(savingRowIds[row.contractId || row.contractNumber]);
 
@@ -369,7 +377,7 @@ function PaymentMilestoneTable({
             type="button"
             className="finance-primary-btn"
             onClick={() => onExportExcel(groupedRows.flatMap((group) => group.items))}
-            disabled={rows.length === 0}
+            disabled={rows.length === 0 || !can("documents.export")}
           >
             Excel&apos;e Aktar
           </button>

@@ -4,6 +4,7 @@ using DnaKalip.Api.Dtos.Companies;
 using DnaKalip.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
+using DnaKalip.Api.Services.Security;
 
 namespace DnaKalip.Api.Endpoints;
 
@@ -13,6 +14,7 @@ public static class CompaniesEndpoints
     {
         var group = app.MapGroup("/api/companies")
             .RequireAuthorization(AuthPolicies.AuthenticatedUser)
+            .AddEndpointFilter<FinancialVisibilityFilter>()
             .WithTags("Companies");
 
         group.MapGet(string.Empty, async (
@@ -131,7 +133,7 @@ public static class CompaniesEndpoints
 
             return Results.Created($"/api/companies/{company.Id}", createdCompany);
         })
-        .WithName("CreateCompany");
+        .WithName("CreateCompany").RequireAuthorization("CompanyManage");
 
         group.MapPut("/{id:guid}", async (
             Guid id,
@@ -187,7 +189,7 @@ public static class CompaniesEndpoints
 
             return Results.Ok(updatedCompany);
         })
-        .WithName("UpdateCompany");
+        .WithName("UpdateCompany").RequireAuthorization("CompanyManage");
 
         return app;
     }
@@ -209,6 +211,7 @@ public static class CompaniesEndpoints
                 company.Phone,
                 company.CreatedAt,
                 company.Contracts
+                    .Where(contract => contract.WorkflowStatus == "active")
                     .OrderByDescending(contract => contract.ContractDate)
                     .ThenBy(contract => contract.ContractNumber)
                     .Select(contract => new CompanyContractSummaryResponse(

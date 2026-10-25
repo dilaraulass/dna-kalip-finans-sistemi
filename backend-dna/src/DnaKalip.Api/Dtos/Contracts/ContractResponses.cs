@@ -18,7 +18,10 @@ public sealed record ContractListItemResponse(
     bool IsArchived,
     DateTimeOffset? ArchivedAt,
     int MilestoneCount,
-    int PaidMilestoneCount);
+    int PaidMilestoneCount,
+    string WorkflowStatus,
+    Guid? CreatedByUserId,
+    Guid? AssignedToUserId);
 
 public sealed record ContractDetailResponse(
     Guid Id,
@@ -42,7 +45,12 @@ public sealed record ContractDetailResponse(
     string? FormDataJson,
     bool IsArchived,
     DateTimeOffset? ArchivedAt,
-    IReadOnlyCollection<ContractMilestoneResponse> Milestones);
+    IReadOnlyCollection<ContractMilestoneResponse> Milestones,
+    string WorkflowStatus,
+    Guid? CreatedByUserId,
+    Guid? AssignedToUserId,
+    string? ReturnReason,
+    byte[] Version);
 
 public sealed record CompanySummaryResponse(
     Guid Id,

@@ -1,6 +1,7 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { useState } from "react";
+import { useAuth } from "../../auth/useAuth";
 import { formatDate, sortRows } from "../../services/tableDisplay";
 import {
   ALL_FILTER_VALUE,
@@ -43,6 +44,7 @@ function ExpenseInvoiceTable({
   onInvoiceInlineValidationError,
 }) {
   const [invoiceDrafts, setInvoiceDrafts] = useState({});
+  const { can } = useAuth();
   const [sortModel, setSortModel] = useState([]);
   const [savingInvoiceIds, setSavingInvoiceIds] = useState({});
 
@@ -115,6 +117,8 @@ function ExpenseInvoiceTable({
       width: 135,
       sortable: true,
       renderCell: ({ row }) => {
+        if (!can("finance.view")) return "***";
+        if (!can("expenses.edit")) return row.invoiceIssued ? "Evet" : "Hayır";
         const draft = getInvoiceDraft(row);
         const isSaving = Boolean(savingInvoiceIds[row.id]);
 
@@ -147,6 +151,8 @@ function ExpenseInvoiceTable({
       width: 150,
       sortable: true,
       renderCell: ({ row }) => {
+        if (!can("finance.view")) return "***";
+        if (!can("expenses.edit")) return row.invoiceNumber || "—";
         const draft = getInvoiceDraft(row);
         const isSaving = Boolean(savingInvoiceIds[row.id]);
 
@@ -213,7 +219,7 @@ function ExpenseInvoiceTable({
             type="button"
             className="finance-primary-btn"
             onClick={() => onExportExcel(sortRows(rows, { field: sortModel[0]?.field, direction: sortModel[0]?.sort }))}
-            disabled={rows.length === 0}
+            disabled={rows.length === 0 || !can("documents.export")}
           >
             Excel&apos;e Aktar
           </button>
@@ -221,6 +227,7 @@ function ExpenseInvoiceTable({
             type="button"
             className="finance-primary-btn"
             onClick={onCreateInvoice}
+            disabled={!can("expenses.edit")}
           >
             Yeni Fatura
           </button>

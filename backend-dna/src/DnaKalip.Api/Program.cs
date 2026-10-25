@@ -46,6 +46,7 @@ builder.Services
         Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")));
 builder.Services.AddScoped<ContractMilestoneSyncService>();
 builder.Services.AddScoped<PasswordHasher>();
+builder.Services.AddScoped<AccessService>();
 builder.Services.AddScoped<InitialAdminSeeder>();
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -59,6 +60,8 @@ builder.Services
             : CookieSecurePolicy.Always;
         options.Cookie.IsEssential = true;
         options.SlidingExpiration = true;
+        options.Events.OnValidatePrincipal = context =>
+            context.HttpContext.RequestServices.GetRequiredService<AccessService>().ValidateCookie(context);
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.Events.OnRedirectToLogin = context =>
         {
@@ -73,6 +76,11 @@ builder.Services
     });
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy("CompanyManage", policy => policy.RequireAuthenticatedUser().RequireAssertion(c =>
+        c.User.Has(Permissions.ContractsEdit) || c.User.Has(Permissions.ExpensesEdit)));
+    foreach (var permission in Permissions.Catalog.Keys)
+        options.AddPolicy(permission, policy => policy.RequireAuthenticatedUser()
+            .RequireAssertion(context => context.User.Has(permission)));
     options.AddPolicy(
         AuthPolicies.AuthenticatedUser,
         policy => policy.RequireAuthenticatedUser());
@@ -142,12 +150,27 @@ if (!app.Environment.IsDevelopment())
 app.UseCors("ProductionCors");
 app.MapHealthChecks("/health");
 
+app.Use(async (context, next) =>
+{
+    try { await next(context); }
+    catch (DbUpdateConcurrencyException) when (!context.Response.HasStarted)
+    {
+        context.Response.StatusCode = 409;
+        await context.Response.WriteAsJsonAsync(new { message = "Kayıt başka bir kullanıcı tarafından değiştirildi. Yenileyip tekrar deneyin." });
+    }
+    catch (System.Text.Json.JsonException) when (!context.Response.HasStarted)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { message = "Form verisi geçersiz." });
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();
 app.MapContractsEndpoints();
+app.MapContractWorkflowEndpoints();
 app.MapCompaniesEndpoints();
 app.MapFinanceEndpoints();
 

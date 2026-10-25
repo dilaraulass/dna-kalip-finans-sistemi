@@ -19,6 +19,7 @@ import {
 import { getCompanies } from "../services/companiesApi";
 import { getContractById } from "../services/contractsApi";
 import { exportRowsToExcel } from "../services/excelExport";
+import { useAuth } from "../auth/useAuth";
 import { ContractPreview } from "./Contracts";
 import "./Finance.css";
 import Drawer from "../components/Drawer/Drawer";
@@ -183,6 +184,7 @@ function getInvoiceArchiveExportColumns({ displayCurrency }) {
 }
 
 function Finance() {
+  const { can } = useAuth();
   const [financeData, setFinanceData] = useState({
     paymentMilestones: [],
     expenseInvoices: [],
@@ -776,6 +778,7 @@ function Finance() {
   }
 
   function handlePaymentExcelExport(exportRows = filteredRows) {
+    if (!can("documents.export")) return;
     const moduleTitle =
       activeTab === FINANCE_MODULES.customer
         ? "Müşteri Tahsilatları"
@@ -795,6 +798,7 @@ function Finance() {
   }
 
   function handleExpenseExcelExport(exportRows = filteredExpenseRows) {
+    if (!can("documents.export")) return;
     exportRowsToExcel({
       filenamePrefix: "ek-gider-faturalari",
       title: "Ek Gider Faturaları",
@@ -805,6 +809,7 @@ function Finance() {
   }
 
   function handleInvoiceArchiveExcelExport(exportRows = filteredInvoiceArchiveRows) {
+    if (!can("documents.export")) return;
     exportRowsToExcel({
       filenamePrefix: "arsivlenen-faturalar",
       title: "Arşivlenenler",
@@ -968,7 +973,7 @@ function Finance() {
       )}
 
       {!loading && !error && (
-        <ExchangeRateSettings
+        can("expenses.edit") && <ExchangeRateSettings
           form={exchangeRateForm}
           error={exchangeRateError}
           saving={exchangeRateSubmitting}
@@ -1051,7 +1056,8 @@ function Finance() {
               onInvoiceInlineValidationError={handleInvoiceInlineValidationError}
             />
           )}
-          {invoiceArchiveModule && (
+          {invoiceArchiveModule && !can("finance.view") && <p>Fatura arşivi: ***</p>}
+          {invoiceArchiveModule && can("finance.view") && (
             <InvoiceArchiveTable
               rows={filteredInvoiceArchiveRows}
               dateStart={dateStart}
@@ -1065,7 +1071,8 @@ function Finance() {
               onExportExcel={handleInvoiceArchiveExcelExport}
             />
           )}
-          {activeTab === FINANCE_MODULES.analysis && (
+          {activeTab === FINANCE_MODULES.analysis && !can("finance.view") && <p>Finansal bilgiler: ***</p>}
+          {activeTab === FINANCE_MODULES.analysis && can("finance.view") && (
             <FinancialAnalysis
               analysisReport={analysisReport}
               analysisWorkOrders={analysisWorkOrders}
@@ -1135,7 +1142,7 @@ function Finance() {
         width={980}
         hideHeader
         actions={
-          previewContract && (
+          previewContract && can("documents.export") && (
             <button
               type="button"
               className="contract-preview-print-btn"

@@ -22,6 +22,39 @@ namespace DnaKalip.Api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("DnaKalip.Api.Entities.AccessAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("AccessAudits");
+                });
+
             modelBuilder.Entity("DnaKalip.Api.Entities.AppRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -168,6 +201,9 @@ namespace DnaKalip.Api.Migrations
                     b.Property<DateTimeOffset?>("ArchivedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("AssignedToUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("CompanyId")
                         .HasColumnType("uniqueidentifier");
 
@@ -192,6 +228,9 @@ namespace DnaKalip.Api.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -252,13 +291,30 @@ namespace DnaKalip.Api.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("WorkOrderNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("WorkflowStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("active");
 
                     b.HasKey("Id");
 
@@ -270,6 +326,8 @@ namespace DnaKalip.Api.Migrations
                     b.HasIndex("IsArchived");
 
                     b.HasIndex("WorkOrderNumber");
+
+                    b.HasIndex("WorkflowStatus", "AssignedToUserId");
 
                     b.ToTable("Contracts");
                 });
@@ -532,6 +590,111 @@ namespace DnaKalip.Api.Migrations
                     b.ToTable("PaymentTrackings");
                 });
 
+            modelBuilder.Entity("DnaKalip.Api.Entities.RolePermission", b =>
+                {
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.HasKey("RoleId", "Code");
+
+                    b.ToTable("RolePermissions");
+
+                    b.HasData(
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "finance.view"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "finance.edit"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "contracts.view"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "contracts.edit"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "milestones.approve"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "payments.edit"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "expenses.edit"
+                        },
+                        new
+                        {
+                            RoleId = new Guid("b8c99520-5c0f-4b31-a1b9-2c23cfcaf5f7"),
+                            Code = "documents.export"
+                        });
+                });
+
+            modelBuilder.Entity("DnaKalip.Api.Entities.UserNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractId");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("UserNotifications");
+                });
+
+            modelBuilder.Entity("DnaKalip.Api.Entities.UserPermission", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("Allowed")
+                        .HasColumnType("bit");
+
+                    b.HasKey("UserId", "Code");
+
+                    b.ToTable("UserPermissions");
+                });
+
             modelBuilder.Entity("DnaKalip.Api.Entities.AppUserRole", b =>
                 {
                     b.HasOne("DnaKalip.Api.Entities.AppRole", "Role")
@@ -600,13 +763,54 @@ namespace DnaKalip.Api.Migrations
                     b.Navigation("ContractMilestone");
                 });
 
+            modelBuilder.Entity("DnaKalip.Api.Entities.RolePermission", b =>
+                {
+                    b.HasOne("DnaKalip.Api.Entities.AppRole", "Role")
+                        .WithMany("Permissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("DnaKalip.Api.Entities.UserNotification", b =>
+                {
+                    b.HasOne("DnaKalip.Api.Entities.Contract", null)
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DnaKalip.Api.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DnaKalip.Api.Entities.UserPermission", b =>
+                {
+                    b.HasOne("DnaKalip.Api.Entities.AppUser", "User")
+                        .WithMany("PermissionOverrides")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("DnaKalip.Api.Entities.AppRole", b =>
                 {
+                    b.Navigation("Permissions");
+
                     b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("DnaKalip.Api.Entities.AppUser", b =>
                 {
+                    b.Navigation("PermissionOverrides");
+
                     b.Navigation("UserRoles");
                 });
 

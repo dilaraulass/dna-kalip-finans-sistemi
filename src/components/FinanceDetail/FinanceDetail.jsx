@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "../../auth/useAuth";
 import { FiFileText } from "react-icons/fi";
 import { formatDate } from "../../services/tableDisplay";
 import "./FinanceDetail.css";
@@ -48,6 +49,7 @@ function FinanceDetail({
   onPreviewContract,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
+  const { can } = useAuth();
 
   if (!selectedRow) return null;
 
@@ -70,7 +72,7 @@ function FinanceDetail({
           !currentForm.paymentDate ||
           currentForm.paymentDate === previousAutoPaymentDate;
 
-        if (shouldUpdatePaymentDate) {
+        if (shouldUpdatePaymentDate && can("payments.edit")) {
           nextForm.paymentDate = calculatePaymentDate(
             nextForm.approvalDate,
             nextForm.dueDays,
@@ -97,8 +99,10 @@ function FinanceDetail({
       paymentDate: form.paymentDate || null,
       status: form.status,
       dueDaysOverride,
-      invoiceIssued: form.invoiceIssued,
-      invoiceNumber: form.invoiceIssued ? form.invoiceNumber.trim() : null,
+      ...(can("payments.edit") ? {
+        invoiceIssued: form.invoiceIssued,
+        invoiceNumber: form.invoiceIssued ? form.invoiceNumber.trim() : null,
+      } : {}),
     });
   }
 
@@ -117,7 +121,7 @@ function FinanceDetail({
             type="button"
             className="finance-detail-contract-preview-btn"
             onClick={() => onPreviewContract?.(selectedRow.contractId)}
-            disabled={!selectedRow.contractId}
+            disabled={!selectedRow.contractId || !can("contracts.view")}
             aria-label={`${selectedRow.contractNumber} sözleşmesini önizle`}
             title="Sözleşme önizlemesini aç"
           >
@@ -170,7 +174,7 @@ function FinanceDetail({
         <div className="finance-detail-grid">
           <div>
             <span>Hakediş Oranı</span>
-            <strong>%{selectedRow.milestoneRate}</strong>
+            <strong>{can("finance.view") ? `%${selectedRow.milestoneRate}` : "***"}</strong>
           </div>
 
           <div>
@@ -197,12 +201,12 @@ function FinanceDetail({
 
           <div>
             <span>Fatura Kesildi</span>
-            <strong>{selectedRow.invoiceIssued ? "Evet" : "Hayır"}</strong>
+            <strong>{!can("finance.view") ? "***" : selectedRow.invoiceIssued ? "Evet" : "Hayır"}</strong>
           </div>
 
           <div>
             <span>Fatura No</span>
-            <strong>{selectedRow.invoiceNumber || "-"}</strong>
+            <strong>{can("finance.view") ? selectedRow.invoiceNumber || "-" : "***"}</strong>
           </div>
         </div>
       </div>
@@ -218,6 +222,7 @@ function FinanceDetail({
             <input
               type="date"
               name="approvalDate"
+              disabled={!can("milestones.approve")}
               value={form.approvalDate}
               onChange={handleChange}
             />
@@ -228,6 +233,7 @@ function FinanceDetail({
             <input
               type="date"
               name="paymentDate"
+              disabled={!can("payments.edit")}
               value={form.paymentDate}
               onChange={handleChange}
             />
@@ -235,7 +241,7 @@ function FinanceDetail({
 
           <label>
             <span>Durum</span>
-            <select name="status" value={form.status} onChange={handleChange}>
+            <select name="status" value={form.status} onChange={handleChange} disabled={!can("payments.edit")}>
               {PAYMENT_STATUS_OPTIONS.map((status) => (
                 <option key={status.value} value={status.value}>
                   {status.label}
@@ -249,6 +255,7 @@ function FinanceDetail({
             <input
               type="number"
               name="dueDays"
+              disabled={!can("milestones.approve")}
               min="0"
               value={form.dueDays}
               onChange={handleChange}
@@ -259,6 +266,7 @@ function FinanceDetail({
             <input
               type="checkbox"
               name="invoiceIssued"
+              disabled={!can("payments.edit")}
               checked={form.invoiceIssued}
               onChange={handleChange}
             />
@@ -272,7 +280,7 @@ function FinanceDetail({
               name="invoiceNumber"
               value={form.invoiceNumber}
               onChange={handleChange}
-              disabled={!form.invoiceIssued}
+              disabled={!form.invoiceIssued || !can("payments.edit")}
               required={form.invoiceIssued}
             />
           </label>
@@ -282,7 +290,7 @@ function FinanceDetail({
           <button
             type="submit"
             className="detail-btn primary"
-            disabled={saving}
+            disabled={saving || (!can("payments.edit") && !can("milestones.approve"))}
           >
             {saving ? "Kaydediliyor..." : "Kaydet"}
           </button>
