@@ -1,0 +1,6 @@
+.activity-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.activity-filters label { display: grid; gap: 6px; font-size: 14px; color: #475569; }
+.activity-filters input { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.activity-actions { display: flex; gap: 10px; margin-bottom: 16px; }
+.activity-actions button { padding: 8px 14px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; cursor: pointer; }
+.activity-note { font-size: 13px; color: #64748b; line-height: 1.5; }

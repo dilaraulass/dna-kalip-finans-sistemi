@@ -237,7 +237,7 @@ public static class ContractsEndpoints
                 return Results.BadRequest(new { message = "Aktif sözleşme için ödeme planının toplamı sözleşme bedeliyle eşleşmelidir." });
 
             db.Contracts.Add(contract);
-            access.Audit(principal, "contract.create", contract.Id, new { contract.WorkflowStatus });
+            access.Audit(principal, "contract.create", contract.Id, new { contract.WorkflowStatus }, contract);
             await db.SaveChangesAsync(cancellationToken);
 
             var createdContract = await GetContractDetailAsync(
@@ -395,7 +395,7 @@ public static class ContractsEndpoints
             }
             if (contract.WorkflowStatus == "active" && contract.Milestones.Count == 0)
                 return Results.BadRequest(new { message = "Aktif sözleşme için ödeme planı gereklidir." });
-            access.Audit(principal, "contract.update", contract.Id, new { contract.WorkflowStatus });
+            access.Audit(principal, "contract.update", contract.Id, new { contract.WorkflowStatus }, contract);
             await db.SaveChangesAsync(cancellationToken);
 
             var updatedContract = await GetContractDetailAsync(
@@ -431,7 +431,7 @@ public static class ContractsEndpoints
             {
                 contract.IsArchived = true;
                 contract.ArchivedAt = DateTimeOffset.UtcNow;
-                access.Audit(principal, "contract.archive", id, new { contract.WorkflowStatus });
+                access.Audit(principal, "contract.archive", id, new { contract.WorkflowStatus }, contract);
                 await db.SaveChangesAsync(cancellationToken);
             }
 
@@ -463,7 +463,7 @@ public static class ContractsEndpoints
             {
                 contract.IsArchived = false;
                 contract.ArchivedAt = null;
-                access.Audit(principal, "contract.restore", id, new { contract.WorkflowStatus });
+                access.Audit(principal, "contract.restore", id, new { contract.WorkflowStatus }, contract);
                 await db.SaveChangesAsync(cancellationToken);
             }
 

@@ -255,6 +255,7 @@ public static class UsersEndpoints
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
+        group.MapUserActivities();
         group.MapGet("/audit", async (DnaKalipDbContext db, CancellationToken ct) =>
             Results.Ok(await db.AccessAudits.AsNoTracking().OrderByDescending(a => a.Id).Take(100).ToListAsync(ct)));
         return app;

@@ -222,6 +222,9 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
         modelBuilder.Entity<AccessAudit>(entity =>
         {
             entity.Property(a => a.Action).HasMaxLength(100);
+            entity.Property(a => a.ActorName).HasMaxLength(200);
+            entity.Property(a => a.ContractNumber).HasMaxLength(100);
+            entity.Property(a => a.WorkOrderNumber).HasMaxLength(50);
             entity.HasIndex(a => a.CreatedAt);
         });
         modelBuilder.Entity<UserNotification>(entity =>

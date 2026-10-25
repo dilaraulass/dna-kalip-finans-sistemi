@@ -366,6 +366,7 @@ public static class FinanceEndpoints
             Guid milestoneId,
             UpdatePaymentTrackingRequest request,
             ClaimsPrincipal principal,
+            AccessService access,
             DnaKalipDbContext db,
             CancellationToken cancellationToken) =>
         {
@@ -398,6 +399,17 @@ public static class FinanceEndpoints
             if (!principal.Has(Permissions.PaymentsEdit) &&
                 (request.PaymentDate != paymentTracking?.PaymentDate || request.Status != (paymentTracking?.Status ?? PaymentStatuses.Pending) || request.InvoiceIssued.HasValue)) return Results.Forbid();
             if (!principal.Has(Permissions.MilestonesApprove) && !principal.Has(Permissions.PaymentsEdit)) return Results.Forbid();
+
+            if (request.ApprovalDate != paymentTracking?.ApprovalDate)
+                access.Audit(principal, "milestone.update", milestoneId, new { milestone.TrackingKey }, milestone.Contract);
+            if ((request.DueDaysOverride ?? milestone.DueDays) != (paymentTracking?.DueDaysOverride ?? milestone.DueDays))
+                access.Audit(principal, "milestone.due-days", milestoneId, new { milestone.TrackingKey }, milestone.Contract);
+            if (request.PaymentDate != paymentTracking?.PaymentDate || request.Status != (paymentTracking?.Status ?? PaymentStatuses.Pending))
+                access.Audit(principal, "payment.update", milestoneId, new { milestone.TrackingKey }, milestone.Contract);
+            if (request.InvoiceIssued.HasValue &&
+                (request.InvoiceIssued.Value != milestone.Contract.InvoiceIssued ||
+                 (request.InvoiceIssued.Value ? NormalizeOptional(request.InvoiceNumber) : null) != milestone.Contract.InvoiceNumber))
+                access.Audit(principal, "invoice.update", milestoneId, new { milestone.TrackingKey }, milestone.Contract);
 
             if (paymentTracking is null)
             {

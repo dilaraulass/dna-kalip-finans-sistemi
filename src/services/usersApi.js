@@ -48,6 +48,9 @@ export function saveRole(id, payload) {
   });
 }
 export function getAccessAudit() { return request("/users/audit"); }
+export function getUserActivities(params, { signal } = {}) {
+  return request(`/users/activities?${new URLSearchParams(params)}`, { signal });
+}
 
 export function createUser(payload, { signal } = {}) {
   return request("/users", {

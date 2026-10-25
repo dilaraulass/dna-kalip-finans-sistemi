@@ -5,6 +5,7 @@ import Companies from "./pages/Companies";
 import PaymentTracking from "./pages/PaymentTracking";
 import Login from "./pages/Login";
 import Users from "./pages/Users";
+import UserActivities from "./pages/UserActivities";
 import Notifications from "./components/Notifications";
 import logo from "./assets/logo.png";
 import { FaBuilding, FaFileContract, FaUsers } from "react-icons/fa";
@@ -123,6 +124,7 @@ function App() {
           <Route path="/companies" element={<Companies />} />
           <Route path="/payments" element={<PaymentTracking />} />
           {isAdmin && <Route path="/users" element={<Users />} />}
+          {isAdmin && <Route path="/users/activities" element={<UserActivities />} />}
           <Route path="/login" element={<Navigate to="/finance" replace />} />
           <Route path="*" element={<Navigate to="/finance" replace />} />
         </Routes>

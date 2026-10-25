@@ -39,9 +39,13 @@ public class AccessService(DnaKalipDbContext db)
         context.ReplacePrincipal(Principal(user));
     }
 
-    public void Audit(ClaimsPrincipal actor, string action, Guid target, object details) => db.AccessAudits.Add(new AccessAudit
+    public void Audit(ClaimsPrincipal actor, string action, Guid target, object details,
+        Contract? contract = null) => db.AccessAudits.Add(new AccessAudit
     {
         ActorId = Guid.Parse(actor.FindFirstValue(ClaimTypes.NameIdentifier)!),
+        ActorName = actor.Identity?.Name,
+        ContractNumber = contract?.ContractNumber,
+        WorkOrderNumber = contract?.WorkOrderNumber,
         Action = action, TargetId = target, Details = System.Text.Json.JsonSerializer.Serialize(details),
     });
 }

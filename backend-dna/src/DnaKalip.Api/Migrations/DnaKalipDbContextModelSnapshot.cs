@@ -38,6 +38,14 @@ namespace DnaKalip.Api.Migrations
                     b.Property<Guid>("ActorId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ContractNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -47,6 +55,10 @@ namespace DnaKalip.Api.Migrations
 
                     b.Property<Guid>("TargetId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("WorkOrderNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 

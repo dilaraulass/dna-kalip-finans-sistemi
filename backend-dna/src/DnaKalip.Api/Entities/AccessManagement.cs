@@ -19,6 +19,9 @@ public class AccessAudit
 {
     public long Id { get; set; }
     public Guid ActorId { get; set; }
+    public string? ActorName { get; set; }
+    public string? ContractNumber { get; set; }
+    public string? WorkOrderNumber { get; set; }
     public string Action { get; set; } = string.Empty;
     public Guid TargetId { get; set; }
     public string Details { get; set; } = string.Empty;

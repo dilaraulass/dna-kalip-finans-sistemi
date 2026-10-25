@@ -69,7 +69,7 @@ public static class ContractWorkflowEndpoints
                         Message = action == "activate" ? "Hazırladığınız sözleşme tamamlandı." : "Sözleşmeniz düzeltme için geri gönderildi." });
                 contract.AssignedToUserId = null;
             }
-            access.Audit(principal, "contract." + action, id, new { contract.WorkflowStatus, contract.AssignedToUserId });
+            access.Audit(principal, "contract." + action, id, new { contract.WorkflowStatus, contract.AssignedToUserId }, contract);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
