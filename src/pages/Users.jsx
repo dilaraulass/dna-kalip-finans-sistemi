@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataGrid } from "@mui/x-data-grid";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 import { trTR } from "@mui/x-data-grid/locales";
-import { createUser, getUsers, updateUser, getRoles, getAccessAudit } from "../services/usersApi";
+import { createUser, getUsers, updateUser, getRoles } from "../services/usersApi";
+import { Link } from "react-router-dom";
+import { FiAlertTriangle } from "react-icons/fi";
 import PermissionFields from "../components/PermissionFields";
 import RoleEditor from "../components/RoleEditor";
+import Drawer from "../components/Drawer/Drawer";
+import { userFormChanged } from "../utils/userFormChanges";
 import "./Users.css";
 
 const EMPTY_USER_FORM = {
@@ -24,7 +29,6 @@ const ROLE_LABELS = {
 function Users() {
   const [roleData, setRoleData] = useState({ roles: [], permissions: [] });
   const [roleEditor, setRoleEditor] = useState(null);
-  const [audit, setAudit] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,6 +36,11 @@ function Users() {
   const [editingUser, setEditingUser] = useState(null);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [roleDirty, setRoleDirty] = useState(false);
+  const initialForm = useRef(EMPTY_USER_FORM);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   const loadUsers = useCallback(async ({ signal } = {}) => {
     setLoading(true);
@@ -64,6 +73,19 @@ function Users() {
     };
   }, [loadUsers]);
 
+  const handleRowClick = useCallback(({ row }) => {
+    setEditingUser(row);
+    const nextForm = {
+      fullName: row.fullName || "", email: row.email || "",
+      password: "", newPassword: "", roleName: row.roleName || "Accounting",
+      isActive: Boolean(row.isActive), permissionOverrides: row.permissionOverrides || {},
+    };
+    initialForm.current = nextForm;
+    setForm(nextForm);
+    setFormError("");
+    setFormOpen(true);
+  }, []);
+
   const columns = useMemo(
     () => [
       { field: "fullName", headerName: "Ad Soyad", flex: 1, minWidth: 180 },
@@ -79,29 +101,35 @@ function Users() {
         headerName: "Durum",
         width: 120,
         valueFormatter: (value) => (value ? "Aktif" : "Pasif"),
+        renderCell: ({ value }) => <span className={`users-status-badge ${value ? "active" : "inactive"}`}>{value ? "Aktif" : "Pasif"}</span>,
       },
+      { field: "actions", headerName: "İşlem", width: 110, sortable: false, filterable: false,
+        renderCell: params => <button type="button" className="users-edit-button"
+          aria-label={`${params.row.fullName} kullanıcısını düzenle`}
+          onClick={event => { event.stopPropagation(); handleRowClick(params); }}>Düzenle</button> },
     ],
-    [roleData.roles],
+    [roleData.roles, handleRowClick],
   );
 
   function resetForm() {
+    initialForm.current = EMPTY_USER_FORM;
     setEditingUser(null);
     setForm(EMPTY_USER_FORM);
     setFormError("");
   }
 
-  function handleRowClick(params) {
-    setEditingUser(params.row);
-    setForm({
-      fullName: params.row.fullName || "",
-      email: params.row.email || "",
-      password: "",
-      newPassword: "",
-      roleName: params.row.roleName || "Accounting",
-      isActive: Boolean(params.row.isActive),
-      permissionOverrides: params.row.permissionOverrides || {},
-    });
-    setFormError("");
+  function closeForm() {
+    if (submitting || roleSaving) return;
+    const dirty = roleEditor ? roleDirty : userFormChanged(form, initialForm.current);
+    if (dirty) { setDiscardOpen(true); return; }
+    discardChanges();
+  }
+
+  function discardChanges() {
+    setDiscardOpen(false);
+    if (roleEditor) { setRoleEditor(null); setRoleDirty(false); return; }
+    setFormOpen(false);
+    resetForm();
   }
 
   function handleChange(event) {
@@ -142,6 +170,7 @@ function Users() {
       }
 
       resetForm();
+      setFormOpen(false);
       await loadUsers();
     } catch (requestError) {
       setFormError(requestError.message || "Kullanıcı kaydedilemedi.");
@@ -157,14 +186,17 @@ function Users() {
           <h1>Kullanıcı Yönetimi</h1>
           <p>Admin kullanıcı ekleyebilir, rol atayabilir ve kullanıcıyı pasifleştirebilir.</p>
         </div>
-        <button type="button" onClick={resetForm}>
+        <div className="users-header-actions">
+        <Link to="/users/activities">Kullanıcı Hareketleri</Link>
+        <button type="button" disabled={loading || Boolean(error)} onClick={() => { resetForm(); setFormOpen(true); }}>
           Yeni Kullanıcı
         </button>
+        </div>
       </section>
 
       <div className="users-layout">
         <section className="users-list-card">
-          <h2>Kullanıcılar</h2>
+          <div className="users-list-heading"><h2>Kullanıcılar</h2><span>{users.length} kullanıcı</span></div>
           {error && <div className="users-status error">{error}</div>}
           <DataGrid
             rows={users}
@@ -181,12 +213,20 @@ function Users() {
           />
         </section>
 
-        <section className="users-form-card">
-          <h2>{editingUser ? "Kullanıcıyı Düzenle" : "Yeni Kullanıcı"}</h2>
+      </div>
+      <Drawer isOpen={formOpen} onClose={closeForm} width={640}
+        title={roleEditor ? (roleEditor.id ? "Rolü Düzenle" : "Yeni Rol") : editingUser ? "Kullanıcıyı Düzenle" : "Yeni Kullanıcı"}
+        subtitle="Kullanıcı bilgilerini ve erişim yetkilerini yönetin.">
+        {roleEditor ? <RoleEditor key={roleEditor.id || "new"} role={roleEditor.id ? roleEditor : null}
+          catalog={roleData.permissions} onBusyChange={setRoleSaving} onDirtyChange={setRoleDirty} onClose={closeForm} onSaved={async (created) => {
+            setRoleEditor(null); setRoleDirty(false); await loadUsers();
+            if (created) setForm(current => ({ ...current, roleName: created.name, permissionOverrides: {} }));
+          }} /> : <section className="users-editor">
           <form onSubmit={handleSubmit} className="users-form">
             <label>
               <span>Ad Soyad</span>
               <input
+                autoFocus
                 name="fullName"
                 value={form.fullName}
                 onChange={handleChange}
@@ -211,15 +251,17 @@ function Users() {
                 {roleData.roles.map(role => <option key={role.id} value={role.name}>{role.displayName}</option>)}
               </select>
             </label>
-            <div className="users-form-actions">
-              <button type="button" onClick={() => setRoleEditor({})}>+ Yeni Rol</button>
-              {form.roleName !== "Admin" && <button type="button" onClick={() => setRoleEditor(roleData.roles.find(r => r.name === form.roleName))}>Rolü Düzenle</button>}
+            <div className="users-form-actions users-role-actions">
+              <button type="button" disabled={submitting} onClick={() => setRoleEditor({})}>+ Yeni Rol</button>
+              {form.roleName !== "Admin" && <button type="button" disabled={submitting} onClick={() => setRoleEditor(roleData.roles.find(r => r.name === form.roleName))}>Rolü Düzenle</button>}
             </div>
             {form.roleName === "Admin" ? <p>Admin tüm yetkilere sahiptir.</p> :
+              <div className="users-permissions-section">
+              <p>Varsayılan yetkiler seçilen rolden gelir. Gerekirse bu kullanıcı için izin verebilir veya engelleyebilirsiniz.</p>
               <PermissionFields catalog={roleData.permissions}
                 rolePermissions={roleData.roles.find(r => r.name === form.roleName)?.permissions || []}
                 overrides={form.permissionOverrides} disabled={submitting}
-                onChange={permissionOverrides => setForm(current => ({ ...current, permissionOverrides }))} />}
+                onChange={permissionOverrides => setForm(current => ({ ...current, permissionOverrides }))} /></div>}
 
             <label className="users-checkbox">
               <input
@@ -259,8 +301,8 @@ function Users() {
 
             {formError && <div className="users-status error">{formError}</div>}
 
-            <div className="users-form-actions">
-              <button type="button" onClick={resetForm} disabled={submitting}>
+            <div className="users-form-actions users-save-actions">
+              <button type="button" onClick={closeForm} disabled={submitting}>
                 Vazgeç
               </button>
               <button type="submit" disabled={submitting}>
@@ -268,22 +310,24 @@ function Users() {
               </button>
             </div>
           </form>
-        </section>
-      </div>
-      {roleEditor && <RoleEditor key={roleEditor.id || "new"} role={roleEditor.id ? roleEditor : null}
-        catalog={roleData.permissions} onClose={() => setRoleEditor(null)} onSaved={async (created) => {
-          setRoleEditor(null); await loadUsers();
-          if (created) setForm(current => ({ ...current, roleName: created.name, permissionOverrides: {} }));
-        }} />}
-      <section className="users-list-card">
-        <button type="button" onClick={async () => {
-          try { setAudit(await getAccessAudit()); } catch (error) { setError(error.message); }
-        }}>Son Yetki ve İşlem Kayıtlarını Göster</button>
-        {audit && <ul>{audit.map(item => <li key={item.id}>
-          {new Date(item.createdAt).toLocaleString("tr-TR")} — {users.find(u => u.id === item.actorId)?.fullName || item.actorId} — {item.action}
-          <details><summary>Ayrıntı</summary><pre>{item.details}</pre></details>
-        </li>)}</ul>}
-      </section>
+        </section>}
+      </Drawer>
+      <Dialog open={discardOpen} onClose={() => setDiscardOpen(false)}
+        maxWidth={false} sx={{ zIndex: 10000 }} className="users-discard-dialog"
+        aria-labelledby="discard-user-title" aria-describedby="discard-user-description">
+        <DialogTitle id="discard-user-title">
+          <span className="users-discard-icon" aria-hidden="true"><FiAlertTriangle /></span>
+          Kaydedilmemiş değişiklikler
+        </DialogTitle>
+        <DialogContent><DialogContentText id="discard-user-description">
+          {roleEditor ? "Rol" : "Kullanıcı"} formunda yaptığınız değişiklikler henüz kaydedilmedi.
+          Çıkarsanız bu değişiklikler kaybolacak.
+        </DialogContentText></DialogContent>
+        <DialogActions>
+          <Button variant="outlined" color="error" onClick={discardChanges}>Kaydetmeden çık</Button>
+          <Button variant="contained" disableElevation autoFocus onClick={() => setDiscardOpen(false)}>Düzenlemeye devam et</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
