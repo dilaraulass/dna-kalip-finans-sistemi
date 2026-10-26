@@ -1,4 +1,7 @@
 import "./Drawer.css";
+import { useId } from "react";
+import { FormScopeContext } from "../UnsavedChanges/UnsavedChangesContext";
+import { useLeaveConfirmation } from "../UnsavedChanges/useUnsavedChanges";
 
 function Drawer({
   isOpen,
@@ -8,12 +11,16 @@ function Drawer({
   width = 500,
   hideHeader = false,
   actions,
+  guardScope,
   children,
 }) {
+  const scope = useId();
+  const requestLeave = useLeaveConfirmation();
+  const close = () => requestLeave(onClose, guardScope || scope);
   if (!isOpen) return null;
 
   return (
-    <div className="drawer-overlay" onClick={onClose}>
+    <div className="drawer-overlay" onClick={close}>
       <aside
         className="drawer"
         style={{ width }}
@@ -24,7 +31,7 @@ function Drawer({
             {actions}
             <button
               className="drawer-close drawer-floating-close"
-              onClick={onClose}
+              onClick={close}
             >
               ×
             </button>
@@ -36,7 +43,7 @@ function Drawer({
               {subtitle && <p>{subtitle}</p>}
             </div>
 
-            <button className="drawer-close" onClick={onClose}>
+            <button className="drawer-close" onClick={close}>
               ×
             </button>
           </div>
@@ -47,7 +54,7 @@ function Drawer({
             hideHeader ? "drawer-content drawer-content-no-header" : "drawer-content"
           }
         >
-          {children}
+          <FormScopeContext.Provider value={guardScope || scope}>{children}</FormScopeContext.Provider>
         </div>
       </aside>
     </div>

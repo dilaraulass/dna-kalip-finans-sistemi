@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import { useUnsavedChanges } from "../UnsavedChanges/useUnsavedChanges";
+import { hasInvoiceChanges } from "../UnsavedChanges/formsEqual";
 import { useAuth } from "../../auth/useAuth";
 import { formatDate, sortRows } from "../../services/tableDisplay";
 import SortableHeader from "../ui/SortableHeader";
@@ -42,6 +44,12 @@ function PaymentMilestoneTable({
   const [savingRowIds, setSavingRowIds] = useState({});
   const [editingCell, setEditingCell] = useState(null);
   const cancelledEditRef = useRef("");
+  useUnsavedChanges(hasInvoiceChanges(invoiceDrafts), { scope: "finance-inline",
+    busy: Object.keys(savingRowIds).length > 0, onDiscard: () => setInvoiceDrafts({}) });
+  const confirmPaymentEdit = useUnsavedChanges(!!editingCell && editingCell.value !== editingCell.initial, {
+    scope: "finance-inline", busy: Object.keys(savingRowIds).length > 0,
+    onDiscard: () => setEditingCell(null),
+  });
 
   function getInvoiceDraft(row) {
     const draftKey = row.contractId || row.contractNumber;
@@ -57,7 +65,10 @@ function PaymentMilestoneTable({
   function setInvoiceDraft(row, draft) {
     setInvoiceDrafts((currentDrafts) => ({
       ...currentDrafts,
-      [row.contractId || row.contractNumber]: draft,
+      [row.contractId || row.contractNumber]: { ...draft,
+        initial: currentDrafts[row.contractId || row.contractNumber]?.initial || {
+          invoiceIssued: Boolean(row.invoiceIssued), invoiceNumber: row.invoiceNumber || "",
+        } },
     }));
   }
 
@@ -117,14 +128,18 @@ function PaymentMilestoneTable({
           : row[field] || "";
     const nextValue = field === "activeDueDays" ? changes.activeDueDays : value || "";
 
-    if (currentValue === nextValue) return;
+    if (currentValue === nextValue) {
+      setEditingCell(current => current?.rowId === row.id && current.field === field ? null : current);
+      return;
+    }
 
     setSavingRowIds((currentIds) => ({ ...currentIds, [row.id]: true }));
 
     try {
       await onPaymentInlineUpdate?.(row, changes);
+      setEditingCell(current => current?.rowId === row.id && current.field === field && current.value === value ? null : current);
     } catch {
-      // Parent bileşen hata mesajını gösterir; sunucu hatasında satırdaki eski değer korunur.
+      // Keep the entered value visible and protected when saving fails.
     } finally {
       setSavingRowIds((currentIds) => {
         const nextIds = { ...currentIds };
@@ -164,7 +179,7 @@ function PaymentMilestoneTable({
           } else if (event.key === "Escape") {
             event.preventDefault();
             cancelledEditRef.current = `${row.id}:${field}`;
-            setEditingCell(null);
+            confirmPaymentEdit(() => setEditingCell(null));
           }
         },
         onBlur: (event) => {
@@ -174,7 +189,6 @@ function PaymentMilestoneTable({
             return;
           }
 
-          setEditingCell(null);
           commitPaymentDraft(row, field, event.currentTarget.value);
         },
       };
@@ -230,7 +244,7 @@ function PaymentMilestoneTable({
               : field === "paymentStatus"
                 ? row.paymentStatus
                 : row[field] || "";
-          setEditingCell({ rowId: row.id, field, value });
+          confirmPaymentEdit(() => setEditingCell({ rowId: row.id, field, value, initial: value }));
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {

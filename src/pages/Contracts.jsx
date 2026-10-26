@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiPrinter } from "react-icons/fi";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { useFormChanges } from "../components/UnsavedChanges/useUnsavedChanges";
 import ContractWorkflow from "../components/ContractWorkflow";
 import Drawer from "../components/Drawer/Drawer";
 import {
@@ -1414,6 +1415,7 @@ function CreateContractForm({
 }) {
   const { can } = useAuth();
   const activeTemplate = CONTRACT_EDITOR_CONFIG[form.financeTab];
+  const confirmCancel = useFormChanges({ form, saveAsDraft }, { enabled: !readOnly, busy: submitting });
   const contractTypeOptions = getContractTypeOptions(form.financeTab);
   const totalPages = form.financeTab === "tedarikci" ? 4 : 2;
   const [partImageError, setPartImageError] = useState("");
@@ -1793,7 +1795,7 @@ function CreateContractForm({
       </div>
 
       <div className="contract-form-actions">
-        <button type="button" onClick={onCancel} disabled={submitting}>
+        <button type="button" onClick={() => confirmCancel(onCancel)} disabled={submitting}>
           {readOnly ? "Kapat" : "Vazgeç"}
         </button>
         {!readOnly && (

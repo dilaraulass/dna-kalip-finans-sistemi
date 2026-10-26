@@ -1,6 +1,8 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { useState } from "react";
+import { useUnsavedChanges } from "../UnsavedChanges/useUnsavedChanges";
+import { hasInvoiceChanges } from "../UnsavedChanges/formsEqual";
 import { useAuth } from "../../auth/useAuth";
 import { formatDate, sortRows } from "../../services/tableDisplay";
 import {
@@ -47,6 +49,8 @@ function ExpenseInvoiceTable({
   const { can } = useAuth();
   const [sortModel, setSortModel] = useState([]);
   const [savingInvoiceIds, setSavingInvoiceIds] = useState({});
+  useUnsavedChanges(hasInvoiceChanges(invoiceDrafts), { scope: "finance-inline",
+    busy: Object.keys(savingInvoiceIds).length > 0, onDiscard: () => setInvoiceDrafts({}) });
 
   function getInvoiceDraft(row) {
     return (
@@ -60,7 +64,9 @@ function ExpenseInvoiceTable({
   function setInvoiceDraft(row, draft) {
     setInvoiceDrafts((currentDrafts) => ({
       ...currentDrafts,
-      [row.id]: draft,
+      [row.id]: { ...draft, initial: currentDrafts[row.id]?.initial || {
+        invoiceIssued: Boolean(row.invoiceIssued), invoiceNumber: row.invoiceNumber || "",
+      } },
     }));
   }
 

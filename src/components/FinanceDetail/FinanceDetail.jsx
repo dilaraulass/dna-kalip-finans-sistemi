@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../auth/useAuth";
+import { useFormChanges } from "../UnsavedChanges/useUnsavedChanges";
 import { FiFileText } from "react-icons/fi";
 import { formatDate } from "../../services/tableDisplay";
 import "./FinanceDetail.css";
@@ -50,6 +51,7 @@ function FinanceDetail({
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
   const { can } = useAuth();
+  useFormChanges(form, { busy: saving });
 
   if (!selectedRow) return null;
 

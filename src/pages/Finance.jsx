@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLeaveConfirmation, useUnsavedChanges } from "../components/UnsavedChanges/useUnsavedChanges";
+import { formsEqual } from "../components/UnsavedChanges/formsEqual";
 import { FiPrinter } from "react-icons/fi";
 import {
   buildFinancialAnalysis,
@@ -221,12 +223,18 @@ function Finance() {
   const [previewContract, setPreviewContract] = useState(null);
   const [previewContractLoading, setPreviewContractLoading] = useState(false);
   const [previewContractError, setPreviewContractError] = useState("");
+  const requestLeave = useLeaveConfirmation();
+  const savedRatesRef = useRef(DEFAULT_EXCHANGE_RATE_FORM);
+  const [savedRateForm, setSavedRateForm] = useState(DEFAULT_EXCHANGE_RATE_FORM);
+  useUnsavedChanges(can("expenses.edit") && !formsEqual(exchangeRateForm, savedRateForm), {
+    scope: "finance-rates", busy: exchangeRateSubmitting || exchangeRateFetching,
+    onDiscard: () => setExchangeRateForm(savedRateForm),
+  });
 
-  const loadFinanceDashboard = useCallback(async ({ signal } = {}) => {
+  const loadFinanceDashboard = useCallback(async ({ signal, replaceRates = false } = {}) => {
     await Promise.resolve();
 
     try {
-      setLoading(true);
       setError("");
       const data = await getFinanceDashboard({ signal });
       const exchangeRates = data.exchangeRates || DEFAULT_EXCHANGE_RATES;
@@ -236,7 +244,11 @@ function Finance() {
         expenseInvoices: data.expenseInvoices || [],
         exchangeRates,
       });
-      setExchangeRateForm(buildExchangeRateForm(exchangeRates));
+      const nextRates = buildExchangeRateForm(exchangeRates);
+      const previousRates = savedRatesRef.current;
+      setExchangeRateForm(current => replaceRates || formsEqual(current, previousRates) ? nextRates : current);
+      savedRatesRef.current = nextRates;
+      setSavedRateForm(nextRates);
     } catch (requestError) {
       if (requestError.name !== "AbortError") {
         setError("Finans verileri yüklenirken bir hata oluştu.");
@@ -878,7 +890,7 @@ function Finance() {
         updateExchangeRate(CURRENCIES.usd, { rateToTry: usdRate }),
       ]);
 
-      await loadFinanceDashboard();
+      await loadFinanceDashboard({ replaceRates: true });
     } catch (requestError) {
       setExchangeRateError(
         requestError.message || "Kur bilgileri güncellenemedi.",
@@ -923,7 +935,7 @@ function Finance() {
         [CURRENCIES.usd]: usdRate,
       }));
 
-      await loadFinanceDashboard();
+      await loadFinanceDashboard({ replaceRates: true });
     } catch (requestError) {
       setExchangeRateError(
         requestError.message || "Güncel kur bilgileri çekilemedi.",
@@ -948,7 +960,7 @@ function Finance() {
     <>
       <FinanceTabs
         activeTab={activeTab}
-        onTabChange={changePaymentModule}
+        onTabChange={module => requestLeave(() => changePaymentModule(module), ["finance-inline", "finance-detail"])}
       />
 
       {loading && (
@@ -959,7 +971,7 @@ function Finance() {
         <div className="finance-status error">{error}</div>
       )}
 
-      {!loading && !error && (paymentModule || expenseModule) && (
+      {!loading && (paymentModule || expenseModule) && (
         <FinanceStatusCards
           statusFilters={STATUS_FILTERS}
           statusFilter={statusFilter}
@@ -972,7 +984,7 @@ function Finance() {
         />
       )}
 
-      {!loading && !error && (
+      {!loading && (
         can("expenses.edit") && <ExchangeRateSettings
           form={exchangeRateForm}
           error={exchangeRateError}
@@ -984,11 +996,11 @@ function Finance() {
         />
       )}
 
-      {!loading && !error && inlineUpdateError && (
+      {!loading && inlineUpdateError && (
         <div className="finance-status error">{inlineUpdateError}</div>
       )}
 
-      {!loading && !error && (
+      {!loading && (
         <div className="dashboard-section">
           {paymentModule && (
             <PaymentMilestoneTable
@@ -1090,6 +1102,7 @@ function Finance() {
       )}
       <Drawer
         isOpen={!!selectedRow}
+        guardScope="finance-detail"
         onClose={() => {
           setSelectedRow(null);
           setDetailUpdateError("");

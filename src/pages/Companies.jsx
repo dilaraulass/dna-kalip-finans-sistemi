@@ -10,6 +10,7 @@ import {
 } from "../services/companiesApi";
 import "./Companies.css";
 import { useAuth } from "../auth/useAuth";
+import { useFormChanges } from "../components/UnsavedChanges/useUnsavedChanges";
 
 const COMPANY_TYPES = {
   all: "all",
@@ -487,6 +488,7 @@ function CompanyForm({
   onChange,
   onSubmit,
 }) {
+  useFormChanges(form, { busy: submitting });
   return (
     <form className="company-form" onSubmit={onSubmit}>
       {error && <div className="companies-status error">{error}</div>}

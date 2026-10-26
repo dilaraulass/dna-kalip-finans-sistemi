@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/useAuth";
 import { getContractCompleters, changeContractWorkflow } from "../services/contractsApi";
+import { useUnsavedChanges } from "./UnsavedChanges/useUnsavedChanges";
 
 export default function ContractWorkflow({ contract, onUpdated }) {
   const { user, can, isAdmin } = useAuth();
@@ -9,6 +10,7 @@ export default function ContractWorkflow({ contract, onUpdated }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  useUnsavedChanges(Boolean(assignee || reason), { busy });
   const canPrepare = can("contracts.edit");
   useEffect(() => {
     if (!canPrepare || contract.workflowStatus === "active") return;
@@ -18,7 +20,11 @@ export default function ContractWorkflow({ contract, onUpdated }) {
   }, [canPrepare, contract.workflowStatus]);
   async function act(action) {
     setBusy(true); setError("");
-    try { await changeContractWorkflow(contract.id, action, { version: contract.version, assigneeId: assignee || null, reason }); await onUpdated(); }
+    try {
+      await changeContractWorkflow(contract.id, action, { version: contract.version, assigneeId: assignee || null, reason });
+      setAssignee(""); setReason("");
+      await onUpdated();
+    }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }

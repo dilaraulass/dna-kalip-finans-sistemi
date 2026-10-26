@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../auth/useAuth";
+import { useFormChanges, useLeaveConfirmation } from "../UnsavedChanges/useUnsavedChanges";
+import { FormScopeContext } from "../UnsavedChanges/UnsavedChangesContext";
 import { createCompany } from "../../services/companiesApi";
 import { getExpenseTypes, getCompanyExpenseDefaults } from "../../services/financeApi";
 import { formatDate } from "../../services/tableDisplay";
@@ -44,6 +46,8 @@ function ExpenseDetail({
   onArchive,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
+  const formScope = useContext(FormScopeContext);
+  const requestLeave = useLeaveConfirmation();
   const { can } = useAuth();
   const isCreateMode = mode === "create";
   const [expenseTypes, setExpenseTypes] = useState([]);
@@ -57,6 +61,8 @@ function ExpenseDetail({
   const [companySaving, setCompanySaving] = useState(false);
   const [companyError, setCompanyError] = useState("");
   const [newCompany, setNewCompany] = useState({ name: "", companyType: "tedarikci", taxNumber: "", email: "", phone: "" });
+  useFormChanges(form, { busy: saving || archiving || defaultsLoading });
+  const confirmCompanyClose = useFormChanges(newCompany, { enabled: showCompanyForm, busy: companySaving });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -272,7 +278,10 @@ function ExpenseDetail({
           </div>
           <div className="finance-detail-actions">
             <button className="detail-btn primary" disabled={companySaving}>{companySaving ? "Kaydediliyor..." : "Firmayı Kaydet ve Seç"}</button>
-            <button type="button" className="detail-btn secondary" disabled={companySaving} onClick={() => setShowCompanyForm(false)}>Vazgeç</button>
+            <button type="button" className="detail-btn secondary" disabled={companySaving} onClick={() => confirmCompanyClose(() => {
+              setShowCompanyForm(false);
+              setNewCompany({ name: "", companyType: "tedarikci", taxNumber: "", email: "", phone: "" });
+            })}>Vazgeç</button>
           </div>
         </form>
       )}
@@ -440,7 +449,7 @@ function ExpenseDetail({
             <button
               type="button"
               className="detail-btn danger"
-              onClick={onArchive}
+              onClick={() => requestLeave(onArchive, formScope)}
               disabled={saving || archiving}
             >
               {archiving ? "Taşınıyor..." : "Silinenlere Taşı"}

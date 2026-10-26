@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataGrid } from "@mui/x-data-grid";
-import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 import { trTR } from "@mui/x-data-grid/locales";
 import { createUser, getUsers, updateUser, getRoles } from "../services/usersApi";
 import { Link } from "react-router-dom";
-import { FiAlertTriangle } from "react-icons/fi";
 import PermissionFields from "../components/PermissionFields";
 import RoleEditor from "../components/RoleEditor";
 import Drawer from "../components/Drawer/Drawer";
 import { userFormChanged } from "../utils/userFormChanges";
+import { useLeaveConfirmation, useUnsavedChanges } from "../components/UnsavedChanges/useUnsavedChanges";
 import "./Users.css";
 
 const EMPTY_USER_FORM = {
@@ -38,9 +37,9 @@ function Users() {
   const [submitting, setSubmitting] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [roleSaving, setRoleSaving] = useState(false);
-  const [roleDirty, setRoleDirty] = useState(false);
-  const initialForm = useRef(EMPTY_USER_FORM);
-  const [discardOpen, setDiscardOpen] = useState(false);
+  const [initialForm, setInitialForm] = useState(EMPTY_USER_FORM);
+  const requestLeave = useLeaveConfirmation();
+  useUnsavedChanges(formOpen && userFormChanged(form, initialForm), { scope: "users", busy: submitting });
 
   const loadUsers = useCallback(async ({ signal } = {}) => {
     setLoading(true);
@@ -80,7 +79,7 @@ function Users() {
       password: "", newPassword: "", roleName: row.roleName || "Accounting",
       isActive: Boolean(row.isActive), permissionOverrides: row.permissionOverrides || {},
     };
-    initialForm.current = nextForm;
+    setInitialForm(nextForm);
     setForm(nextForm);
     setFormError("");
     setFormOpen(true);
@@ -112,7 +111,7 @@ function Users() {
   );
 
   function resetForm() {
-    initialForm.current = EMPTY_USER_FORM;
+    setInitialForm(EMPTY_USER_FORM);
     setEditingUser(null);
     setForm(EMPTY_USER_FORM);
     setFormError("");
@@ -120,14 +119,11 @@ function Users() {
 
   function closeForm() {
     if (submitting || roleSaving) return;
-    const dirty = roleEditor ? roleDirty : userFormChanged(form, initialForm.current);
-    if (dirty) { setDiscardOpen(true); return; }
-    discardChanges();
+    requestLeave(discardChanges, roleEditor ? "roles" : "users");
   }
 
   function discardChanges() {
-    setDiscardOpen(false);
-    if (roleEditor) { setRoleEditor(null); setRoleDirty(false); return; }
+    if (roleEditor) { setRoleEditor(null); return; }
     setFormOpen(false);
     resetForm();
   }
@@ -218,8 +214,8 @@ function Users() {
         title={roleEditor ? (roleEditor.id ? "Rolü Düzenle" : "Yeni Rol") : editingUser ? "Kullanıcıyı Düzenle" : "Yeni Kullanıcı"}
         subtitle="Kullanıcı bilgilerini ve erişim yetkilerini yönetin.">
         {roleEditor ? <RoleEditor key={roleEditor.id || "new"} role={roleEditor.id ? roleEditor : null}
-          catalog={roleData.permissions} onBusyChange={setRoleSaving} onDirtyChange={setRoleDirty} onClose={closeForm} onSaved={async (created) => {
-            setRoleEditor(null); setRoleDirty(false); await loadUsers();
+          catalog={roleData.permissions} onBusyChange={setRoleSaving} onClose={closeForm} onSaved={async (created) => {
+            setRoleEditor(null); await loadUsers();
             if (created) setForm(current => ({ ...current, roleName: created.name, permissionOverrides: {} }));
           }} /> : <section className="users-editor">
           <form onSubmit={handleSubmit} className="users-form">
@@ -312,22 +308,6 @@ function Users() {
           </form>
         </section>}
       </Drawer>
-      <Dialog open={discardOpen} onClose={() => setDiscardOpen(false)}
-        maxWidth={false} sx={{ zIndex: 10000 }} className="users-discard-dialog"
-        aria-labelledby="discard-user-title" aria-describedby="discard-user-description">
-        <DialogTitle id="discard-user-title">
-          <span className="users-discard-icon" aria-hidden="true"><FiAlertTriangle /></span>
-          Kaydedilmemiş değişiklikler
-        </DialogTitle>
-        <DialogContent><DialogContentText id="discard-user-description">
-          {roleEditor ? "Rol" : "Kullanıcı"} formunda yaptığınız değişiklikler henüz kaydedilmedi.
-          Çıkarsanız bu değişiklikler kaybolacak.
-        </DialogContentText></DialogContent>
-        <DialogActions>
-          <Button variant="outlined" color="error" onClick={discardChanges}>Kaydetmeden çık</Button>
-          <Button variant="contained" disableElevation autoFocus onClick={() => setDiscardOpen(false)}>Düzenlemeye devam et</Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 }

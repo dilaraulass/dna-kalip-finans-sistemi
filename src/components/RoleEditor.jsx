@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { saveRole } from "../services/usersApi";
 import PermissionFields from "./PermissionFields";
 import { roleFormChanged } from "../utils/userFormChanges";
+import { useUnsavedChanges } from "./UnsavedChanges/useUnsavedChanges";
 
-export default function RoleEditor({ role, catalog, onSaved, onClose, onBusyChange, onDirtyChange }) {
+export default function RoleEditor({ role, catalog, onSaved, onClose, onBusyChange }) {
   const [name, setName] = useState(role?.displayName || "");
   const [permissions, setPermissions] = useState(role?.permissions || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dirty = roleFormChanged(name, permissions, role);
-  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useUnsavedChanges(dirty, { scope: "roles", busy: saving });
   async function submit(event) {
     event.preventDefault(); setSaving(true); setError("");
     onBusyChange?.(true);

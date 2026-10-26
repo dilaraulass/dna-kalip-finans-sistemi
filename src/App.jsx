@@ -14,12 +14,14 @@ import { HiBars3 } from "react-icons/hi2";
 import { FiLogOut } from "react-icons/fi";
 import { useState } from "react";
 import { useAuth } from "./auth/useAuth";
+import { useLeaveConfirmation } from "./components/UnsavedChanges/useUnsavedChanges";
 import "./App.css";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, loading, isAdmin, signOut, can } = useAuth();
   const location = useLocation();
+  const requestLeave = useLeaveConfirmation();
 
   if (loading) {
     return (
@@ -100,7 +102,7 @@ function App() {
           <button
             type="button"
             className="logout-btn"
-            onClick={signOut}
+            onClick={() => requestLeave(signOut)}
             data-label="Çıkış Yap"
           >
             <FiLogOut size={18} />
