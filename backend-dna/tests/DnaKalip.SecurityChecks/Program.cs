@@ -193,6 +193,37 @@ try
     var audit = (await Request(admin, HttpMethod.Get, "/api/users/audit", null, 200))!.AsArray();
     Check(audit.Count >= 10 && !audit.ToJsonString().Contains("Test-only"), "Audit tracks operations without passwords");
 
+    var auditExpenseType = new ExpenseType { Name = "Audit test expense" };
+    db.ExpenseTypes.Add(auditExpenseType);
+    await db.SaveChangesAsync();
+    var expensePayload = new JsonObject {
+        ["companyId"] = companyId, ["expenseTypeId"] = auditExpenseType.Id,
+        ["workOrderNumber"] = "WO-EXPENSE-AUDIT", ["amount"] = 250,
+        ["currency"] = "TRY", ["invoiceDate"] = "2026-10-29", ["dueDays"] = 30,
+        ["status"] = "pending", ["invoiceIssued"] = true, ["invoiceNumber"] = "TEST-EXPENSE-001"
+    };
+    var expense = (await Request(approver, HttpMethod.Post, "/api/expense-invoices", expensePayload, 201))!;
+    var expenseId = Guid.Parse(expense["id"]!.GetValue<string>());
+    var expensePath = "/api/expense-invoices/" + expenseId;
+    await Request(approver, HttpMethod.Put, expensePath, expensePayload, 204);
+    Check(await db.AccessAudits.CountAsync(a => a.TargetId == expenseId) == 1, "Unchanged expense does not create update activity");
+    expensePayload["dueDays"] = 45;
+    await Request(approver, HttpMethod.Put, expensePath, expensePayload, 204);
+    var invalidExpense = expensePayload.DeepClone().AsObject(); invalidExpense["amount"] = -1;
+    await Request(approver, HttpMethod.Put, expensePath, invalidExpense, 400);
+    await Request(stranger, HttpMethod.Put, expensePath, expensePayload, 403);
+    await Request(approver, HttpMethod.Patch, expensePath + "/archive", null, 204);
+    await Request(approver, HttpMethod.Patch, expensePath + "/archive", null, 204);
+    var expenseAudits = await db.AccessAudits.AsNoTracking().Where(a => a.TargetId == expenseId).ToListAsync();
+    Check(expenseAudits.Count == 3 && expenseAudits.Select(a => a.Action).ToHashSet().SetEquals(
+        new[] { "expense.create", "expense.update", "expense.archive" }), "Expense create/update/delete audited once; failed operations excluded");
+    Check(expenseAudits.All(a => a.ActorName == "approver" && a.WorkOrderNumber == "WO-EXPENSE-AUDIT" && a.ContractNumber == null), "Expense activities retain actor and work order without a fabricated contract");
+    Check(expenseAudits.Single(a => a.Action == "expense.update").Details.Contains("DueDays"), "Expense audit records changed field names");
+    var expenseActivities = (await Request(admin, HttpMethod.Get,
+        "/api/users/activities?workOrderNumber=WO-EXPENSE-AUDIT", null, 200))!["items"]!.AsArray();
+    Check(expenseActivities.Select(a => a!["actionLabel"]!.GetValue<string>()).ToHashSet().SetEquals(
+        new[] { "Ek gider faturası ekleme", "Ek gider faturası düzenleme", "Ek gider faturası silme" }), "Admin activity list exposes all three expense actions in Turkish");
+
     await Request(anonymous, HttpMethod.Get, "/api/users/activities", null, 401);
     await Request(approver, HttpMethod.Get, "/api/users/activities", null, 403);
     var activities = (await Request(admin, HttpMethod.Get, "/api/users/activities?pageSize=100", null, 200))!;

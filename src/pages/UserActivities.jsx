@@ -75,7 +75,7 @@ export default function UserActivities() {
         onSortModelChange={model => { setSorting(model); setPagination(current => ({ ...current, page: 0 })); }}
         pageSizeOptions={[10, 25, 50, 100]} sortingOrder={["asc", "desc"]} disableColumnFilter disableRowSelectionOnClick
         localeText={trTR.components.MuiDataGrid.defaultProps.localeText} autoHeight />
-      <p className="activity-note">Sözleşme, hakediş/onay, vade, ödeme ve fatura bilgisi değişiklikleri ile kullanıcı/rol işlemleri gösterilir.
+      <p className="activity-note">Sözleşme, hakediş/onay, vade, ödeme ve fatura bilgisi değişiklikleri, ek gider faturası ekleme/düzenleme/silme ve kullanıcı/rol işlemleri gösterilir.
         Eski kayıtların sözleşme ve iş emri bilgileri bulunmayabilir; eski kayıtlarda kullanıcı adı mevcut kullanıcı kaydından gösterilir.
         Daha önce kaydedilmemiş işlemler geriye dönük oluşturulmaz.</p>
     </section>

@@ -36,6 +36,9 @@ public static class UserActivitiesEndpoints
                                 audit.Action == "milestone.due-days" ? "Vade güncelleme" :
                                 audit.Action == "payment.update" ? "Ödeme takibi güncelleme" :
                                 audit.Action == "invoice.update" ? "Fatura bilgileri güncelleme" :
+                                audit.Action == "expense.create" ? "Ek gider faturası ekleme" :
+                                audit.Action == "expense.update" ? "Ek gider faturası düzenleme" :
+                                audit.Action == "expense.archive" ? "Ek gider faturası silme" :
                                 audit.Action == "user.create" ? "Kullanıcı oluşturma" :
                                 audit.Action == "user.update" ? "Kullanıcı güncelleme" :
                                 audit.Action == "role.create" ? "Rol oluşturma" :

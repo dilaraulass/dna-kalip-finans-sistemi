@@ -445,6 +445,8 @@ public static class FinanceEndpoints
         app.MapPost("/api/expense-invoices", async (
             CreateExpenseInvoiceRequest request,
             DnaKalipDbContext db,
+            ClaimsPrincipal principal,
+            AccessService access,
             CancellationToken cancellationToken) =>
         {
             var validationErrors = ValidateExpenseInvoiceRequest(
@@ -495,6 +497,8 @@ public static class FinanceEndpoints
             };
 
             db.ExpenseInvoices.Add(invoice);
+            access.Audit(principal, "expense.create", invoice.Id,
+                new { invoice.CompanyId, invoice.InvoiceNumber }, workOrderNumber: invoice.WorkOrderNumber);
             await db.SaveChangesAsync(cancellationToken);
 
             return Results.Created($"/api/expense-invoices/{invoice.Id}", new
@@ -510,6 +514,8 @@ public static class FinanceEndpoints
             Guid id,
             UpdateExpenseInvoiceRequest request,
             DnaKalipDbContext db,
+            ClaimsPrincipal principal,
+            AccessService access,
             CancellationToken cancellationToken) =>
         {
             var validationErrors = ValidateExpenseInvoiceRequest(
@@ -566,6 +572,13 @@ public static class FinanceEndpoints
                 ? NormalizeOptional(request.InvoiceNumber)
                 : null;
 
+            db.ChangeTracker.DetectChanges();
+            var changedFields = db.Entry(invoice).Properties
+                .Where(property => property.IsModified).Select(property => property.Metadata.Name).ToArray();
+            if (changedFields.Length > 0)
+                access.Audit(principal, "expense.update", invoice.Id,
+                    new { invoice.CompanyId, invoice.InvoiceNumber, ChangedFields = changedFields },
+                    workOrderNumber: invoice.WorkOrderNumber);
             await db.SaveChangesAsync(cancellationToken);
 
             return Results.NoContent();
@@ -577,6 +590,8 @@ public static class FinanceEndpoints
         app.MapPatch("/api/expense-invoices/{id:guid}/archive", async (
             Guid id,
             DnaKalipDbContext db,
+            ClaimsPrincipal principal,
+            AccessService access,
             CancellationToken cancellationToken) =>
         {
             var invoice = await db.ExpenseInvoices
@@ -594,6 +609,8 @@ public static class FinanceEndpoints
                 invoice.IsArchived = true;
                 invoice.ArchivedAt = DateTimeOffset.UtcNow;
 
+                access.Audit(principal, "expense.archive", invoice.Id,
+                    new { invoice.CompanyId, invoice.InvoiceNumber }, workOrderNumber: invoice.WorkOrderNumber);
                 await db.SaveChangesAsync(cancellationToken);
             }
 

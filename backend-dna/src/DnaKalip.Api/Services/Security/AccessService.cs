@@ -40,12 +40,12 @@ public class AccessService(DnaKalipDbContext db)
     }
 
     public void Audit(ClaimsPrincipal actor, string action, Guid target, object details,
-        Contract? contract = null) => db.AccessAudits.Add(new AccessAudit
+        Contract? contract = null, string? workOrderNumber = null) => db.AccessAudits.Add(new AccessAudit
     {
         ActorId = Guid.Parse(actor.FindFirstValue(ClaimTypes.NameIdentifier)!),
         ActorName = actor.Identity?.Name,
         ContractNumber = contract?.ContractNumber,
-        WorkOrderNumber = contract?.WorkOrderNumber,
+        WorkOrderNumber = contract?.WorkOrderNumber ?? workOrderNumber,
         Action = action, TargetId = target, Details = System.Text.Json.JsonSerializer.Serialize(details),
     });
 }
