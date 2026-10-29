@@ -2,6 +2,8 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../auth/useAuth";
 import { useFormChanges, useLeaveConfirmation } from "../UnsavedChanges/useUnsavedChanges";
 import { FormScopeContext } from "../UnsavedChanges/UnsavedChangesContext";
+import InvoiceImport from './InvoiceImport';
+import { mergeInvoiceSuggestions } from '../../services/invoiceExtraction';
 import { createCompany } from "../../services/companiesApi";
 import { getExpenseTypes, getCompanyExpenseDefaults } from "../../services/financeApi";
 import { formatDate } from "../../services/tableDisplay";
@@ -46,6 +48,9 @@ function ExpenseDetail({
   onArchive,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
+  const touchedFields = useRef(new Set());
+  const [importedFields, setImportedFields] = useState({});
+  const [importBusy, setImportBusy] = useState(false);
   const formScope = useContext(FormScopeContext);
   const requestLeave = useLeaveConfirmation();
   const { can } = useAuth();
@@ -79,7 +84,7 @@ function ExpenseDetail({
     defaultsRequest.current?.abort();
     const controller = new AbortController();
     defaultsRequest.current = controller;
-    setForm((current) => ({ ...current, companyId, dueDays: "", expenseTypeId: "" }));
+    setForm((current) => ({ ...current, companyId, dueDays: touchedFields.current.has('dueDays') ? current.dueDays : "", expenseTypeId: "" }));
     setDefaultsMessage("");
     setDefaultsLoading(Boolean(companyId));
     if (!companyId) return;
@@ -87,8 +92,8 @@ function ExpenseDetail({
       const defaults = await getCompanyExpenseDefaults(companyId, { signal: controller.signal });
       if (controller.signal.aborted) return;
       if (defaults) {
-        setForm((current) => ({ ...current, dueDays: String(defaults.dueDays), expenseTypeId: String(defaults.expenseTypeId || "") }));
-        setDefaultsMessage("Vade ve gider türü son ek gider faturasından alındı. Değiştirebilirsiniz.");
+        setForm((current) => ({ ...current, dueDays: touchedFields.current.has('dueDays') ? current.dueDays : String(defaults.dueDays), expenseTypeId: String(defaults.expenseTypeId || "") }));
+        setDefaultsMessage(touchedFields.current.has('dueDays') ? "Gider türü son faturadan önerildi; girdiğiniz veya belgeden aktardığınız vade korundu." : "Vade ve gider türü son ek gider faturasından alındı. Değiştirebilirsiniz.");
       } else {
         setDefaultsMessage("Bu firmanın önceki faturası yok. Vade ve gider türünü girin.");
       }
@@ -124,6 +129,13 @@ function ExpenseDetail({
 
   function handleChange(event) {
     const { checked, name, type, value } = event.target;
+    touchedFields.current.add(name);
+    setImportedFields(current => {
+      const next = { ...current };
+      delete next[name];
+      if (name === 'invoiceIssued' && !checked) delete next.invoiceNumber;
+      return next;
+    });
 
     if (name === "companyId") {
       if (value === "__new") {
@@ -143,7 +155,7 @@ function ExpenseDetail({
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (saving || archiving || defaultsLoading || typesLoading || typesError || showCompanyForm || companySaving) return;
+    if (saving || archiving || defaultsLoading || typesLoading || typesError || showCompanyForm || companySaving || importBusy) return;
 
     onSave?.({
       companyId: form.companyId,
@@ -164,6 +176,18 @@ function ExpenseDetail({
 
   return (
     <div className="finance-detail">
+      {isCreateMode && can('expenses.edit') && can('finance.view') && <InvoiceImport
+        onBusyChange={setImportBusy}
+        companies={companyOptions} disabled={saving || companySaving || defaultsLoading || showCompanyForm}
+        onApply={fields => {
+          const touched = new Set(touchedFields.current);
+          setForm(current => mergeInvoiceSuggestions(current, fields, touched));
+          // Use the same merge rules for provenance, including the amount/currency pair.
+          const imported = mergeInvoiceSuggestions({}, fields, touched);
+          setImportedFields(current => ({ ...current, ...imported }));
+          if (fields.dueDays !== undefined) touchedFields.current.add('dueDays');
+        }}
+      />}
       {!isCreateMode && (
         <>
           <div className="finance-detail-status">
@@ -347,7 +371,7 @@ function ExpenseDetail({
           </label>
 
           <label>
-            <span>Tutar</span>
+            <span>Tutar {importedFields.amount === form.amount && <small className="invoice-import-badge">Faturadan alındı</small>}</span>
             <input
               type="number"
               name="amount"
@@ -360,7 +384,7 @@ function ExpenseDetail({
           </label>
 
           <label>
-            <span>Para Birimi</span>
+            <span>Para Birimi {importedFields.currency === form.currency && <small className="invoice-import-badge">Faturadan alındı</small>}</span>
             <select name="currency" value={form.currency} onChange={handleChange}>
               {CURRENCY_OPTIONS.map((currency) => (
                 <option key={currency} value={currency}>
@@ -371,7 +395,7 @@ function ExpenseDetail({
           </label>
 
           <label>
-            <span>Fatura Tarihi</span>
+            <span>Fatura Tarihi {importedFields.invoiceDate === form.invoiceDate && <small className="invoice-import-badge">Faturadan alındı</small>}</span>
             <input
               type="date"
               name="invoiceDate"
@@ -382,7 +406,7 @@ function ExpenseDetail({
           </label>
 
           <label>
-            <span>Vade (Gün)</span>
+            <span>Vade (Gün) {importedFields.dueDays === form.dueDays && <small className="invoice-import-badge">Faturadan alındı</small>}</span>
             <input
               type="number"
               name="dueDays"
@@ -425,7 +449,7 @@ function ExpenseDetail({
           </label>
 
           <label>
-            <span>Fatura No</span>
+            <span>Fatura No {importedFields.invoiceNumber === form.invoiceNumber && <small className="invoice-import-badge">Faturadan alındı</small>}</span>
             <input
               type="text"
               name="invoiceNumber"
@@ -441,7 +465,7 @@ function ExpenseDetail({
           <button
             type="submit"
             className="detail-btn primary"
-            disabled={saving || archiving || defaultsLoading || typesLoading || !!typesError || showCompanyForm || companySaving}
+            disabled={saving || archiving || defaultsLoading || typesLoading || !!typesError || showCompanyForm || companySaving || importBusy}
           >
             {saving ? "Kaydediliyor..." : isCreateMode ? "Fatura Ekle" : "Kaydet"}
           </button>

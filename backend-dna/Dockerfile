@@ -6,6 +6,7 @@ RUN npm ci
 COPY index.html vite.config.js eslint.config.js ./
 COPY public ./public
 COPY src ./src
+COPY scripts/prepare-ocr.mjs ./scripts/prepare-ocr.mjs
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build

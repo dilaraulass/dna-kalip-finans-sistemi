@@ -13,6 +13,7 @@ deploy/.env
 .tools/
 
 node_modules
+public/ocr/
 dist
 dist-ssr
 *.local
