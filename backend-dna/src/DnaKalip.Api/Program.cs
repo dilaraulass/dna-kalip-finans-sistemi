@@ -7,6 +7,9 @@ using DnaKalip.Api.Services.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
+using System.Globalization;
+using Microsoft.AspNetCore.Antiforgery;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +36,37 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddHealthChecks();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "dna_csrf";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.Path = "/";
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+});
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
+            AutoReplenishment = true,
+        }));
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds)
+                .ToString(CultureInfo.InvariantCulture);
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            message = "Çok fazla giriş denemesi yaptınız. Bir dakika bekleyip tekrar deneyin.",
+        }, cancellationToken);
+    };
+});
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -97,6 +131,21 @@ if (builder.Environment.IsDevelopment())
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment() && app.Configuration["ReverseProxy:Address"] is { Length: > 0 } proxy)
+{
+    var address = System.Net.IPAddress.Parse(proxy);
+    var forwarding = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                           Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto,
+        ForwardLimit = 1
+    };
+    forwarding.KnownIPNetworks.Clear();
+    forwarding.KnownProxies.Clear();
+    forwarding.KnownProxies.Add(address);
+    app.UseForwardedHeaders(forwarding);
+}
+
 if (!app.Environment.IsDevelopment())
 {
     await using var scope = app.Services.CreateAsyncScope();
@@ -147,7 +196,9 @@ if (!app.Environment.IsDevelopment())
     app.UseStaticFiles();
 }
 
+app.UseRouting();
 app.UseCors("ProductionCors");
+app.UseRateLimiter();
 app.MapHealthChecks("/health");
 
 app.Use(async (context, next) =>
@@ -166,6 +217,36 @@ app.Use(async (context, next) =>
 });
 app.UseAuthentication();
 app.UseAuthorization();
+
+// JSON Minimal APIs do not automatically validate antiforgery tokens.
+// Protect every unsafe API method, including login/logout and development tools.
+app.Use(async (context, next) =>
+{
+    var request = context.Request;
+    if (request.Path.StartsWithSegments("/api") &&
+        !HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method) &&
+        !HttpMethods.IsOptions(request.Method))
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+        try
+        {
+            if (!request.Headers.ContainsKey("X-CSRF-TOKEN"))
+                throw new AntiforgeryValidationException("Missing CSRF header.");
+            await antiforgery.ValidateRequestAsync(context);
+        }
+        catch (AntiforgeryValidationException)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = "csrf_validation_failed",
+                message = "Güvenlik doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin. İşlem kaydedilmedi.",
+            });
+            return;
+        }
+    }
+    await next(context);
+});
 
 app.MapAuthEndpoints();
 app.MapUsersEndpoints();

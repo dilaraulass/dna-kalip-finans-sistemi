@@ -143,7 +143,8 @@ dotnet ef database update --project backend-dna/src/DnaKalip.Api/DnaKalip.Api.cs
 Eski JSON verisini development ortamında SQL Server’a aktarmak için:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:5257/api/dev/seed-from-json"
+$csrf = Invoke-RestMethod -Uri "http://localhost:5257/api/auth/csrf" -SessionVariable dnaSession
+Invoke-RestMethod -Method Post -Uri "http://localhost:5257/api/dev/seed-from-json" -WebSession $dnaSession -Headers @{ "X-CSRF-TOKEN" = $csrf.token }
 ```
 
 Bu endpoint sadece development amaçlıdır. Production ortamında kullanılmamalıdır.
@@ -213,14 +214,30 @@ PUT    /api/companies/{id}
 - Hakediş ve ödeme planları backend tarafında milestone kayıtlarına senkronlanır.
 - `src/data/database.json` eski HTML uygulamasından geçiş/import amacıyla kullanılır; uzun vadede ana veri kaynağı SQL Server’dır.
 
-## Production Öncesi Yapılacaklar
+## Production Yayını İçin Kalanlar
 
-- Yetki ve taslak akışının hedef ortamda kullanıcı kabul testi
-- Production connection string ve secret yönetimi
-- Seed endpointinin production’da kapalı olduğunun doğrulanması
-- Backup stratejisi
-- Hata loglama ve izleme
-- Deployment dokümantasyonu
+Bu depo henüz tek başına production yayını için yeterli değildir. `deploy/docker-compose.test.yml`
+yalnızca test içindir; gerçek ortam için aşağıdaki yayın kapıları tamamlanmalıdır:
+
+- Hedef domain, TLS sertifikası, reverse proxy ve yalnızca bilinen proxy'lere güvenen
+  forwarded-header yapılandırması belirlenmeli. Proxy arkasındaki rate limit gerçek istemci
+  IP'siyle doğrulanmalı.
+- Production SQL Server ayrı ve yönetilen bir ortamda çalışmalı; ağ erişimi sınırlandırılmalı,
+  bağlantı şifresi secret store/environment üzerinden verilmeli, TLS doğrulaması kapatılmamalı.
+- İlk admin parolası tek seferlik ve güçlü olmalı; kurulum sonrası `Auth:InitialAdmin:Enabled`
+  kapatılmalı. Data Protection key'leri yedeklenmeli ve birden fazla API instance'ı varsa
+  paylaşılan/korumalı depolamada tutulmalı.
+- Migration öncesi yedek ve geri dönüş planı hazırlanmalı; otomatik migration production'da
+  varsayılan olarak kapalı tutulmalı.
+- SQL dahil readiness/health kontrolleri, merkezi loglama, hata/başarısız giriş alarmı ve
+  yedek geri yükleme tatbikatı kurulmalı. Mevcut `/health` endpoint'i veritabanı bağlantısını
+  doğrulamaz.
+- CI/CD hattı ve release onayları kurulmalı. Yetki/iş akışı için hedef ortamda kabul testi,
+  yedek/geri yükleme, tarayıcı ve eşzamanlı kullanıcı testi yapılmalı.
+- Yayın öncesi `npm audit --omit=dev` ve `dotnet list package --vulnerable --include-transitive`
+  yeniden çalıştırılmalı; bulgular giderilmeden sürüm çıkarılmamalı.
+- Frontend production build'inde ana JS paketi 1 MB üzerindedir; modül bazlı code-splitting ve
+  gerçek kullanımda yükleme süresi ölçümü yapılmalıdır.
 
 ## Kullanıcı Yetkileri ve Sözleşme Tamamlama
 

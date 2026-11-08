@@ -32,6 +32,8 @@ test("company without invoice history returns no defaults", async (t) => {
 test("create and edit send user chosen expense type ID and due days", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url === '/api/auth/csrf') return Response.json({ token: 'test-token' });
+    assert.equal(options.headers.get('X-CSRF-TOKEN'), 'test-token');
     calls.push({ url, method: options.method, body: JSON.parse(options.body) });
     return new Response(null, { status: 204 });
   });

@@ -8,6 +8,7 @@ using DnaKalip.Api.Services.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Antiforgery;
 
 namespace DnaKalip.Api.Endpoints;
 
@@ -17,6 +18,13 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth")
             .WithTags("Auth");
+
+        group.MapGet("/csrf", (HttpContext context, IAntiforgery antiforgery) =>
+        {
+            context.Response.Headers.CacheControl = "no-store, no-cache";
+            context.Response.Headers.Pragma = "no-cache";
+            return Results.Ok(new { token = antiforgery.GetAndStoreTokens(context).RequestToken });
+        }).AllowAnonymous().WithName("GetCsrfToken");
 
         group.MapPost("/login", async (
             LoginRequest request,
@@ -70,6 +78,7 @@ public static class AuthEndpoints
             return Results.Ok(ToCurrentUserResponse(user, role));
         })
         .AllowAnonymous()
+        .RequireRateLimiting("login")
         .WithName("Login");
 
         group.MapPost("/logout", async (HttpContext httpContext) =>

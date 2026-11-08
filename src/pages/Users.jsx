@@ -275,10 +275,14 @@ function Users() {
                 <input
                   type="password"
                   name="password"
+                  minLength={12}
+                  maxLength={128}
+                  autoComplete="new-password"
                   value={form.password}
                   onChange={handleChange}
                   required
                 />
+                <small>12–128 karakter. Uzun bir şifre cümlesi kullanabilirsiniz.</small>
               </label>
             )}
 
@@ -288,10 +292,14 @@ function Users() {
                 <input
                   type="password"
                   name="newPassword"
+                  minLength={12}
+                  maxLength={128}
+                  autoComplete="new-password"
                   value={form.newPassword}
                   onChange={handleChange}
                   placeholder="Değişmeyecekse boş bırakın"
                 />
+                <small>Değiştiriyorsanız 12–128 karakter kullanın.</small>
               </label>
             )}
 

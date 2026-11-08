@@ -46,6 +46,10 @@ public class InitialAdminSeeder(
                 "Initial admin seed is enabled but Auth:InitialAdmin:Email or Auth:InitialAdmin:Password is missing.");
         }
 
+        var passwordError = PasswordPolicy.Validate(password);
+        if (passwordError is not null)
+            throw new InvalidOperationException("Initial admin password: " + passwordError);
+
         var normalizedEmail = email.ToUpperInvariant();
         var adminRole = await db.AppRoles
             .FirstAsync(role => role.Name == AppRoles.Admin, cancellationToken);

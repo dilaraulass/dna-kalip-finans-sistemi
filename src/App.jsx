@@ -19,9 +19,18 @@ import "./App.css";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logoutError, setLogoutError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
   const { user, loading, isAdmin, signOut, can } = useAuth();
   const location = useLocation();
   const requestLeave = useLeaveConfirmation();
+  async function handleLogout() {
+    setLoggingOut(true);
+    setLogoutError("");
+    try { await signOut(); }
+    catch (error) { setLogoutError(error.message || "Çıkış yapılamadı. Tekrar deneyin."); }
+    finally { setLoggingOut(false); }
+  }
 
   if (loading) {
     return (
@@ -102,7 +111,8 @@ function App() {
           <button
             type="button"
             className="logout-btn"
-            onClick={() => requestLeave(signOut)}
+            onClick={() => requestLeave(handleLogout)}
+            disabled={loggingOut}
             data-label="Çıkış Yap"
           >
             <FiLogOut size={18} />
@@ -118,6 +128,7 @@ function App() {
           </div>
           <Notifications />
         </header>
+        {logoutError && <div role="alert" className="users-status error">{logoutError}</div>}
 
         <Routes>
           <Route path="/" element={<Navigate to="/finance" replace />} />

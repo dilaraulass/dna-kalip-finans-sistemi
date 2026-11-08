@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { csrfFetch } from '../services/csrfFetch.js';
 
 export default function Notifications() {
   const [items, setItems] = useState([]);
@@ -18,7 +19,7 @@ export default function Notifications() {
   }, []);
   async function read(id) {
     try {
-      const response = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+      const response = await csrfFetch(`/api/notifications/${id}/read`, { method: "PATCH" });
       if (!response.ok) throw new Error("Bildirim okundu olarak işaretlenemedi.");
       setItems(current => current.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (e) { setError(e.message); }

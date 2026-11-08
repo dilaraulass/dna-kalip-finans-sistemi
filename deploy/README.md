@@ -1,6 +1,7 @@
 # DNA Kalıp test yayını
 
 Bu klasör test yayını için örnek dosyaları içerir.
+`docker-compose.test.yml` production deployment değildir.
 
 ## Docker ile hızlı test
 
@@ -25,6 +26,9 @@ http://localhost:8080
 ```
 
 Bu compose dosyasında migration başlangıçta otomatik uygulanır ve aktif admin yoksa env dosyasındaki ilk admin oluşturulur. Gerçek production için SQL Server ayrı yönetilmeli, connection string ve admin şifresi dosyada değil sunucu secret/environment ayarlarında tutulmalıdır.
+Bu test compose'unda kullanılan örnek parolaları gerçek ortama taşımayın. Gerçek ortamda ilk
+admin kurulumundan sonra `Auth:InitialAdmin:Enabled` ayarını kapatın ve production Data
+Protection key'lerini kalıcı, yedekli ve erişimi sınırlandırılmış bir yerde saklayın.
 
 ## Nginx örneği
 

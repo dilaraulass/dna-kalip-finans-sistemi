@@ -314,11 +314,8 @@ public static class UsersEndpoints
             request.Email,
             request.RoleName);
 
-        AddErrorIf(
-            errors,
-            string.IsNullOrWhiteSpace(request.Password),
-            "password",
-            "Şifre zorunludur.");
+        var passwordError = PasswordPolicy.Validate(request.Password);
+        if (passwordError is not null) errors["password"] = [passwordError];
 
         return errors;
     }
@@ -331,6 +328,11 @@ public static class UsersEndpoints
             request.Email,
             request.RoleName);
 
+        if (!string.IsNullOrEmpty(request.NewPassword))
+        {
+            var passwordError = PasswordPolicy.Validate(request.NewPassword);
+            if (passwordError is not null) errors["newPassword"] = [passwordError];
+        }
         return errors;
     }
 

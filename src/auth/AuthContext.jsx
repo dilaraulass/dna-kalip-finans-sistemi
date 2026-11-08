@@ -36,11 +36,8 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    try {
-      await logout();
-    } finally {
-      setUser(null);
-    }
+    await logout();
+    setUser(null);
   }
 
   useEffect(() => {

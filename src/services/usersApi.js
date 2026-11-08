@@ -1,8 +1,10 @@
+import { csrfFetch } from './csrfFetch.js';
+
 const API_BASE_URL = "/api";
 
 async function request(path, options = {}) {
   const { headers, ...fetchOptions } = options;
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await csrfFetch(`${API_BASE_URL}${path}`, {
     ...fetchOptions,
     credentials: "include",
     headers: {
@@ -18,10 +20,10 @@ async function request(path, options = {}) {
       const errorBody = await response.json();
       message =
         errorBody.message ||
-        errorBody.title ||
         Object.values(errorBody.errors || {})
           .flat()
           .join(" ") ||
+        errorBody.title ||
         message;
     } catch {
       // Response body JSON değilse varsayılan hata mesajını kullanırız.

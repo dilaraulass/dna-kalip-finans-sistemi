@@ -18,6 +18,12 @@ void Check(bool condition, string name)
 }
 var grants = Permissions.Effective([new(Permissions.FinanceView, true)],
     [new(Permissions.FinanceView, false), new(Permissions.ContractsEdit, true)], false);
+Check(PasswordPolicy.Validate(null) is not null && PasswordPolicy.Validate("   ") is not null, "Empty passwords rejected");
+Check(PasswordPolicy.Validate(new string('a', 11)) is not null, "Short new passwords rejected");
+Check(PasswordPolicy.Validate(new string('a', 12)) is null, "12-character passwords accepted");
+Check(PasswordPolicy.Validate("uzun bir sifre cumlesi") is null, "Passphrases accepted without composition rules");
+Check(PasswordPolicy.Validate(new string('a', 128)) is null && PasswordPolicy.Validate(new string('a', 129)) is not null, "Password maximum enforced");
+Check(PasswordPolicy.Validate(" " + new string('a', 11) + " ") is not null, "Padding cannot bypass minimum length");
 Check(!grants.Contains(Permissions.FinanceView) && grants.Contains(Permissions.ContractsEdit), "User overrides role grants");
 Check(Permissions.Effective([], [], true).Length == Permissions.Catalog.Count, "Admin has all grants");
 Check(Permissions.Effective([new("unknown", true)], [], false).Length == 0, "Unknown grants are ignored");
@@ -84,9 +90,17 @@ try
         if (ready) break; await Task.Delay(250);
     }
     Check(ready, "Real API started on loopback");
+    async Task<string> Csrf(HttpClient client)
+    {
+        using var response = await client.GetAsync("/api/auth/csrf");
+        response.EnsureSuccessStatusCode();
+        return (JsonNode.Parse(await response.Content.ReadAsStringAsync()))!["token"]!.GetValue<string>();
+    }
     async Task<JsonNode?> Request(HttpClient client, HttpMethod method, string path, object? body, int expected)
     {
         using var request = new HttpRequestMessage(method, path);
+        if (method != HttpMethod.Get && method != HttpMethod.Head && method != HttpMethod.Options)
+            request.Headers.Add("X-CSRF-TOKEN", await Csrf(client));
         if (body is not null) request.Content = JsonContent.Create(body);
         using var response = await client.SendAsync(request);
         var text = await response.Content.ReadAsStringAsync();
@@ -96,16 +110,42 @@ try
         return response.Content.Headers.ContentType?.MediaType?.Contains("json") == true
             ? JsonNode.Parse(text) : JsonValue.Create(text);
     }
-    async Task Login(HttpClient client, string email) => await Request(client, HttpMethod.Post, "/api/auth/login", new { email, password = "Test-only-8765" }, 200);
+    async Task Login(HttpClient client, string email) => await Request(client, HttpMethod.Post, "/api/auth/login",
+        new { email, password = email == adminUser.Email ? "Test-only-8765" : "Test-only-long-8765" }, 200);
     await Request(anonymous, HttpMethod.Get, "/api/contracts", null, 401);
+    var anonymousToken = await Csrf(admin);
     await Login(admin, adminUser.Email);
+    // Explicit bypass requests test rejection before any endpoint side effects.
+    async Task RejectCsrf(HttpClient client, string path, string? token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path);
+        if (token is not null) request.Headers.Add("X-CSRF-TOKEN", token);
+        using var response = await client.SendAsync(request);
+        Check(response.StatusCode == HttpStatusCode.Forbidden &&
+            (await response.Content.ReadAsStringAsync()).Contains("csrf_validation_failed"), "Missing/invalid/stale CSRF blocked: " + path);
+    }
+    await RejectCsrf(anonymous, "/api/auth/login", null);
+    await RejectCsrf(admin, "/api/auth/logout", null);
+    await RejectCsrf(admin, "/api/auth/logout", "tampered-token");
+    await RejectCsrf(admin, "/api/auth/logout", anonymousToken);
+    await RejectCsrf(admin, "/api/expense-invoices", null);
+    await RejectCsrf(admin, "/api/dev/seed-from-json", null);
+    var signedInToken = await Csrf(admin);
+    await Request(admin, HttpMethod.Post, "/api/auth/logout", null, 204);
+    await RejectCsrf(admin, "/api/auth/logout", signedInToken);
+    await Login(admin, adminUser.Email);
+    await Request(admin, HttpMethod.Get, "/api/auth/me", null, 200);
     await Request(admin, HttpMethod.Put, $"/api/users/{adminUser.Id}", new { fullName = adminUser.FullName, email = adminUser.Email,
         roleName = "Admin", isActive = false }, 409);
     var role = await Request(admin, HttpMethod.Post, "/api/roles", new { displayName = "Teknik", permissions = new[] { "contracts.view", "contracts.edit", "milestones.approve" } }, 201);
     var roleName = role!["name"]!.GetValue<string>();
     async Task<JsonNode> AddUser(string name, string chosenRole) => (await Request(admin, HttpMethod.Post, "/api/users", new
-    { fullName = name, email = name + "@test.local", password = "Test-only-8765", roleName = chosenRole, isActive = true }, 201))!;
+    { fullName = name, email = name + "@test.local", password = "Test-only-long-8765", roleName = chosenRole, isActive = true }, 201))!;
     var techUser = await AddUser("technical", roleName);
+    await Request(admin, HttpMethod.Post, "/api/users", new { fullName = "Weak", email = "weak@test.local",
+        password = "short", roleName, isActive = true }, 400);
+    await Request(admin, HttpMethod.Put, "/api/users/" + techUser["id"]!.GetValue<string>(), new {
+        fullName = "technical", email = "technical@test.local", roleName, isActive = true, newPassword = "short" }, 400);
     await AddUser("stranger", roleName);
     await AddUser("approver", "Accounting");
     await Login(technical, "technical@test.local"); await Login(stranger, "stranger@test.local"); await Login(approver, "approver@test.local");
@@ -273,6 +313,26 @@ try
     Check(day["totalCount"]!.GetValue<int>() == 2, "Date filter is inclusive start and exclusive next day, using explicit timezone");
     var legacy = (await Request(admin, HttpMethod.Get, "/api/users/activities?actorName=Test%20Admin&pageSize=100", null, 200))!["items"]!.AsArray();
     Check(legacy.Any(r => r!["isLegacy"]!.GetValue<bool>() && r["contractNumber"] is null), "Legacy records remain readable without fabricated contract snapshots");
+    // Verify throttling after other checks, so exhausting the quota cannot affect their logins.
+    HttpResponseMessage? throttled = null;
+    for (var attempt = 0; attempt < 11; attempt++)
+    {
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login") {
+            Content = JsonContent.Create(new { email = "unknown@test.local", password = "invalid" }) };
+        loginRequest.Headers.Add("X-Forwarded-For", $"192.0.2.{attempt + 1}");
+        loginRequest.Headers.Add("X-CSRF-TOKEN", await Csrf(anonymous));
+        var response = await anonymous.SendAsync(loginRequest);
+        if (response.StatusCode == HttpStatusCode.TooManyRequests) { throttled = response; break; }
+        Check(response.StatusCode == HttpStatusCode.Unauthorized, "Unknown login has generic failure");
+        response.Dispose();
+    }
+    Check(throttled is not null, "Login throttling cannot be bypassed using untrusted forwarded IP headers");
+    using (throttled)
+    {
+        Check(throttled!.Headers.RetryAfter?.Delta > TimeSpan.Zero, "Throttle response includes retry delay");
+        Check((await throttled.Content.ReadAsStringAsync()).Contains("message"), "Throttle response matches frontend error format");
+    }
+    await Request(admin, HttpMethod.Get, "/api/auth/me", null, 200);
     Console.WriteLine($"{checks} checks passed.");
     if (args.Contains("--browser"))
     {

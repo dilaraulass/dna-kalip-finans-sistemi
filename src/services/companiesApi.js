@@ -1,8 +1,10 @@
+import { csrfFetch } from './csrfFetch.js';
+
 const API_BASE_URL = "/api";
 
 async function request(path, options = {}) {
   const { headers, ...fetchOptions } = options;
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await csrfFetch(`${API_BASE_URL}${path}`, {
     ...fetchOptions,
     headers: {
       Accept: "application/json",
