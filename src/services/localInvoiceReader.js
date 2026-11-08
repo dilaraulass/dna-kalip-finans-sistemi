@@ -34,9 +34,10 @@ function canvasFor(width, height, maxSide) {
 }
 
 function thumbnail(canvas) {
-  const preview = canvasFor(canvas.width, canvas.height, 1000);
+  // Keep the already bounded render resolution so invoice text remains legible when zooming.
+  const preview = canvasFor(canvas.width, canvas.height, 2400);
   preview.getContext('2d').drawImage(canvas, 0, 0, preview.width, preview.height);
-  const result = preview.toDataURL('image/jpeg', 0.8);
+  const result = preview.toDataURL('image/jpeg', 0.92);
   preview.width = preview.height = 0;
   return result;
 }
