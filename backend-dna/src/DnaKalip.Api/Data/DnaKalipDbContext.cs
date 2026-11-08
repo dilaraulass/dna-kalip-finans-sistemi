@@ -105,6 +105,8 @@ public class DnaKalipDbContext(DbContextOptions<DnaKalipDbContext> options)
 
         modelBuilder.Entity<ExpenseInvoice>(entity =>
         {
+            entity.Property(invoice => invoice.SourceInvoiceId).HasMaxLength(128).UseCollation("Latin1_General_100_BIN2");
+            entity.HasIndex(invoice => invoice.SourceInvoiceId).IsUnique().HasFilter("[SourceInvoiceId] IS NOT NULL");
             entity.HasOne(invoice => invoice.ExpenseType)
                 .WithMany()
                 .HasForeignKey(invoice => invoice.ExpenseTypeId)

@@ -482,6 +482,11 @@ namespace DnaKalip.Api.Migrations
                     b.Property<DateOnly?>("PaymentDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("SourceInvoiceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(25)
@@ -500,6 +505,10 @@ namespace DnaKalip.Api.Migrations
                     b.HasIndex("InvoiceDate");
 
                     b.HasIndex("IsArchived");
+
+                    b.HasIndex("SourceInvoiceId")
+                        .IsUnique()
+                        .HasFilter("[SourceInvoiceId] IS NOT NULL");
 
                     b.HasIndex("WorkOrderNumber");
 

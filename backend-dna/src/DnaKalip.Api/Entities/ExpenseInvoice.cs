@@ -3,6 +3,7 @@ namespace DnaKalip.Api.Entities;
 public class ExpenseInvoice
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public string? SourceInvoiceId { get; set; }
     public Guid? CompanyId { get; set; }
     public int? ExpenseTypeId { get; set; }
     public ExpenseType? ExpenseType { get; set; }

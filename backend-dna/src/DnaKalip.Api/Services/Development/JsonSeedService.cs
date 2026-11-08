@@ -30,7 +30,10 @@ public sealed class JsonSeedService(
             .ToDictionaryAsync(contract => contract.ContractNumber, StringComparer.OrdinalIgnoreCase, cancellationToken);
         var existingContractNumbers = existingContractsByNumber.Keys
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var existingInvoiceKeys = await dbContext.ExpenseInvoices
+        var importedIds = (await dbContext.ExpenseInvoices.Where(i => i.SourceInvoiceId != null)
+            .Select(i => i.SourceInvoiceId!).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        var existingInvoiceKeys = await dbContext.ExpenseInvoices.Where(i => i.SourceInvoiceId == null)
             .Select(invoice => new
             {
                 invoice.WorkOrderNumber,
@@ -66,7 +69,7 @@ public sealed class JsonSeedService(
 
             if (id == "SYSTEM_EXPENSES_DB")
             {
-                SeedExpenseInvoices(item, invoiceKeys, expenseTypes, counters);
+                SeedExpenseInvoices(item, importedIds, seenIds, invoiceKeys, expenseTypes, counters);
                 continue;
             }
 
@@ -499,7 +502,9 @@ public sealed class JsonSeedService(
 
     private void SeedExpenseInvoices(
         JsonElement item,
-        HashSet<string> invoiceKeys,
+        HashSet<string> importedIds,
+        HashSet<string> seenIds,
+        HashSet<string> unlinkedKeys,
         Dictionary<string, ExpenseType> expenseTypes,
         SeedCounters counters)
     {
@@ -507,12 +512,19 @@ public sealed class JsonSeedService(
 
         foreach (var invoiceJson in invoices)
         {
+            var sourceId = GetString(invoiceJson, "id");
+            if (string.IsNullOrWhiteSpace(sourceId) || sourceId.Length > 128 || sourceId != sourceId.Trim() || !seenIds.Add(sourceId))
+                throw new InvalidDataException("Eksik, geçersiz veya tekrarlı fatura ID'si var. Aktarım kaydedilmedi.");
+            if (importedIds.Contains(sourceId))
+            {
+                counters.ExpenseInvoicesSkipped++;
+                continue;
+            }
             var invoiceDate = GetDate(invoiceJson, "date");
 
             if (!invoiceDate.HasValue)
             {
-                counters.ExpenseInvoicesSkipped++;
-                continue;
+                throw new InvalidDataException("Kaynak faturanın tarihi geçersiz. Aktarım kaydedilmedi.");
             }
 
             var workOrder = GetString(invoiceJson, "isEmri") ?? "GENEL";
@@ -521,11 +533,8 @@ public sealed class JsonSeedService(
             var amount = GetDecimal(invoiceJson, "amount") ?? 0;
             var invoiceKey = BuildInvoiceKey(workOrder, invoiceType, description, amount, invoiceDate.Value);
 
-            if (!invoiceKeys.Add(invoiceKey))
-            {
-                counters.ExpenseInvoicesSkipped++;
-                continue;
-            }
+            if (unlinkedKeys.Contains(invoiceKey))
+                throw new InvalidDataException("Kaynak ID'si olmayan mevcut bir faturayla çakışma var. Boş veritabanında aktarın veya önce eski kayıtları uzlaştırın. Aktarım kaydedilmedi.");
 
             var typeName = string.IsNullOrWhiteSpace(invoiceType) ? "Diğer" : invoiceType.Trim();
             if (!expenseTypes.TryGetValue(typeName, out var expenseType))
@@ -537,6 +546,7 @@ public sealed class JsonSeedService(
 
             dbContext.ExpenseInvoices.Add(new ExpenseInvoice
             {
+                SourceInvoiceId = sourceId,
                 ExpenseType = expenseType,
                 WorkOrderNumber = workOrder,
                 InvoiceType = invoiceType,

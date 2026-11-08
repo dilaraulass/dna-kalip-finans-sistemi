@@ -52,6 +52,12 @@ try
 {
     await db.Database.MigrateAsync();
     Check(!(await db.Database.GetPendingMigrationsAsync()).Any(), "All migrations applied on isolated database");
+    var seedInput = args.FirstOrDefault(a => a.StartsWith("--verify-json=", StringComparison.Ordinal));
+    if (seedInput is not null)
+    {
+        await ExpenseSeedChecks.VerifyAsync(db, Path.GetFullPath(seedInput["--verify-json=".Length..]));
+        return; // finally removes only this run's temporary database
+    }
     var adminRole = await db.AppRoles.SingleAsync(r => r.Name == AppRoles.Admin);
     var adminUser = new AppUser { FullName = "Test Admin", Email = "admin@test.local", NormalizedEmail = "ADMIN@TEST.LOCAL",
         PasswordHash = new PasswordHasher().Hash("Test-only-8765"), UserRoles = [new AppUserRole { Role = adminRole }] };
