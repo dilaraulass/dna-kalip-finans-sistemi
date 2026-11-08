@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extractInvoiceFields, parseInvoiceMoney, matchingInvoiceCompanies, mergeInvoiceSuggestions } from './invoiceExtraction.js';
+import { extractInvoiceFields, parseInvoiceMoney, matchingInvoiceCompanies, matchInvoiceSeller, mergeInvoiceSuggestions } from './invoiceExtraction.js';
 import { validateInvoiceFile, abortable } from './localInvoiceReader.js';
 
 test('Turkish invoice extracts labelled fields and grand total, not VAT or subtotal', () => {
@@ -29,6 +29,30 @@ test('company candidates use exact tax id, no fuzzy name matching or automatic c
   const companies = [{ id: 'a', name: 'ABC', taxNumber: '1234567890' }, { id: 'b', name: 'ABC' }];
   assert.deepEqual(matchingInvoiceCompanies(['1234567890'], companies).map(c => c.id), ['a']);
   assert.deepEqual(matchingInvoiceCompanies(['123456789'], companies), []);
+});
+
+test('payable amount takes precedence over tax-inclusive total; currency can touch the digits', () => {
+  const {fields} = extractInvoiceFields('Vergiler Dahil Toplam Tutar 1.200,00TL\nÖdenecek Tutar 1.100,00TL\nVade günü: 30');
+  assert.deepEqual(fields, {amount: 1100, currency: 'TRY', dueDays: 30});
+  assert.equal(extractInvoiceFields('Genel Toplam 1200,00 TL\nÖdenecek Tutar: belirsiz').fields.amount, undefined);
+});
+
+test('seller matching requires a clear recipient and exactly one registered seller tax ID', () => {
+  const buyer = 'SAYIN\nDNA MÜHENDİSLİK KALIP MAKİNE\nAdres: Test\nVKN: 0000000001';
+  const seller = 'ÖRNEK FİRMA\nAdres: Test\nVKN: 0000000002';
+  const companies = [{id:'buyer',taxNumber:'0000000001'}, {id:'supplier',taxNumber:'0000000002'}];
+  for (const text of [buyer+'\n'+seller, seller+'\n'+buyer]) {
+    const parsed = extractInvoiceFields(text).seller;
+    assert.equal(parsed.name, 'ÖRNEK FİRMA');
+    assert.equal(matchInvoiceSeller(parsed, companies)?.id, 'supplier');
+    assert.equal(matchInvoiceSeller(parsed, companies.slice(0,1)), null);
+    assert.equal(matchInvoiceSeller(parsed, [...companies, {...companies[1], id:'duplicate'}]), null);
+  }
+  const unlabelled = extractInvoiceFields(seller+'\n'+buyer.replace('SAYIN\n','')).seller;
+  assert.equal(unlabelled.name, 'ÖRNEK FİRMA');
+  assert.equal(matchInvoiceSeller(unlabelled, companies), null);
+  assert.equal(extractInvoiceFields(buyer).seller, null);
+  assert.equal(extractInvoiceFields(buyer+'\n'+seller+'\nVKN: 0000000003').seller, null);
 });
 test('manual edits and the amount/currency pair are preserved; no payment inference', () => {
   const form = { amount: '99', currency: 'USD', invoiceDate: '', invoiceNumber: '', invoiceIssued: false, status: 'pending', paymentDate: '', companyId: 'company' };

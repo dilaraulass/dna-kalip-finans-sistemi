@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { readLocalInvoice } from '../../services/localInvoiceReader';
-import { extractInvoiceFields, matchingInvoiceCompanies } from '../../services/invoiceExtraction';
+import { extractInvoiceFields, matchInvoiceSeller } from '../../services/invoiceExtraction';
 import { useUnsavedChanges } from '../UnsavedChanges/useUnsavedChanges';
 import './InvoiceImport.css';
 import { FiFileText, FiUploadCloud, FiCheck, FiCheckCircle, FiAlertCircle, FiRefreshCw, FiMinus, FiPlus, FiChevronLeft, FiChevronRight, FiEye } from 'react-icons/fi';
@@ -61,7 +61,7 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
       const document = await readLocalInvoice(file, { signal: controller.signal, onProgress: setProgress });
       if (controller.signal.aborted) return;
       const extracted = extractInvoiceFields(document.text);
-      onApply(extracted.fields);
+      onApply(extracted.fields, matchInvoiceSeller(extracted.seller, companies)?.id);
       setResult({ ...document, ...extracted, fileName: file.name });
       setPage(0); setZoom(100);
     } catch (failure) {
@@ -72,7 +72,6 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
       if (request.current === controller) { setBusy(false); setProgress(''); }
     }
   }
-  const candidates = result ? matchingInvoiceCompanies(result.taxNumbers, companies) : [];
   const missing = result ? Object.keys(labels).filter(key => result.fields[key] === undefined) : [];
   const needsReview = result && ['invoiceNumber', 'invoiceDate', 'amount', 'currency'].some(key => result.fields[key] === undefined);
   const scanLabel = progress.startsWith('PDF') ? progress.replace('PDF sayfası okunuyor:', 'Sayfa okunuyor ·') :
@@ -135,7 +134,9 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
       <p className="invoice-import-footnote">Touchpad üzerinde iki parmağınızı açıp kapatarak yakınlaştırın veya uzaklaştırın.</p>
       </details>
       {missing.length > 0 && <p className="invoice-import-notice"><FiAlertCircle aria-hidden="true" /><span>Okunamayan alanları formda kontrol edin: {missing.map(key => labels[key]).join(', ')}.</span></p>}
-      {candidates.length > 0 && <p className="invoice-import-company">Olası firma: <strong>{candidates.map(c => c.name).join(', ')}</strong></p>}
+      <p className="invoice-import-company">{result.seller
+        ? <>Belgedeki olası satıcı: <strong>{result.seller.name}</strong>. Firma seçimini kontrol edin.</>
+        : 'Satıcı net okunamadı. Firmayı listeden seçin.'}</p>
       <div className="invoice-import-success" role="status"><FiCheck aria-hidden="true" /><span>Formdaki bilgileri ve ödenecek toplamı belgeyle karşılaştırıp kaydedin.<small>Elle girdiğiniz değerler korundu. Firma ve gider türünü seçin. Henüz kayıt oluşturulmadı.</small></span></div>
     </>}
   </section>;

@@ -25,8 +25,12 @@ Okuma tek başına kayıt oluşturmaz. Elle değiştirilmiş alanlar korunur.
   otomatik TRY varsayımı yapılmaz. Bu kural tabanlı ilk sürüm her düzeni tanımaz.
 - Tutar önerisi net/matrah değil, ödenecek/genel toplamdır. Kullanıcı tutarın
   kaydetmek istediği tutar olduğunu formda kontrol eder; ayrı KDV muhasebesi eklenmedi.
-- Vergi numarası eşleşmeleri olası firma olarak gösterilir. Belgede hem alıcı
-  hem satıcı bulunabileceği için `CompanyId` kullanıcı tarafından seçilir.
+- Gelen faturalarda okunan olası satıcı unvanı gösterilir. Alıcı açıkça
+  belirtilmişse ve satıcı VKN/TCKN'sine uyan tek firma varsa o firmanın
+  `CompanyId` değeri seçilir. Unvan benzerliğinden seçim yapılmaz. Belirsiz
+  taraflar, eksik veya mükerrer numaralar kullanıcı seçimine bırakılır.
+- Tevkifat gibi durumlarda vergiler dahil toplamdan farklı olabilen
+  “Ödenecek Tutar” esas alınır; çelişen ödenecek tutarlar elle kontrol edilir.
 - İş emri, gider türü ve ödeme yapılmış durumu belgeden tahmin edilmez.
   Mevcut firma geçmişi gider türünü önerebilir; elle girilen/aktarılan vade korunur.
 - Kullanıcının değiştirdiği alanlar korunur; tutar/para birimi bir çift olarak korunur.
