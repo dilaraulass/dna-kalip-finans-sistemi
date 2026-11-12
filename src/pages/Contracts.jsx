@@ -2,6 +2,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import { trTR } from "@mui/x-data-grid/locales";
 import { useEffect, useMemo, useState } from "react";
 import { FiPrinter } from "react-icons/fi";
+import { openContractPrint } from "../services/contractPrint";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { useFormChanges } from "../components/UnsavedChanges/useUnsavedChanges";
@@ -1342,7 +1343,7 @@ function ContractsPage() {
             <button
               type="button"
               className="contract-preview-print-btn"
-              onClick={() => window.print()}
+              onClick={() => openContractPrint(selectedContract.id)}
               aria-label="Sözleşme çıktısı al veya PDF olarak kaydet"
               title="Çıktı al / PDF olarak kaydet"
             >
@@ -1843,6 +1844,7 @@ export function ContractPreview({ contract, onCancel }) {
 function A4Page({ children, financeTab, pageNum, totalPages }) {
   return (
     <div
+      data-page-number={pageNum}
       className={`contract-document-editor ${
         financeTab === "musteri"
           ? "contract-document-editor-customer"

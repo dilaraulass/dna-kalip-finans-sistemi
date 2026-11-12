@@ -6,6 +6,7 @@ import PaymentTracking from "./pages/PaymentTracking";
 import Login from "./pages/Login";
 import Users from "./pages/Users";
 import UserActivities from "./pages/UserActivities";
+import ContractPrint from "./pages/ContractPrint";
 import Notifications from "./components/Notifications";
 import logo from "./assets/logo.png";
 import { FaBuilding, FaFileContract, FaUsers } from "react-icons/fa";
@@ -49,6 +50,20 @@ function App() {
           path="*"
           element={<Navigate to="/login" replace state={{ from: location }} />}
         />
+      </Routes>
+    );
+  }
+
+  if (/^\/contracts\/[^/]+\/print\/?$/.test(location.pathname)) {
+    return (
+      <Routes>
+        <Route
+          path="/contracts/:id/print"
+          element={can("contracts.view") && can("documents.export")
+            ? <ContractPrint />
+            : <div className="app-loading">Sözleşme çıktısı alma yetkiniz yok.</div>}
+        />
+        <Route path="*" element={<Navigate to="/contracts" replace />} />
       </Routes>
     );
   }

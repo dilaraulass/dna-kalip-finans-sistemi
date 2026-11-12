@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLeaveConfirmation, useUnsavedChanges } from "../components/UnsavedChanges/useUnsavedChanges";
 import { formsEqual } from "../components/UnsavedChanges/formsEqual";
 import { FiPrinter } from "react-icons/fi";
+import { openContractPrint } from "../services/contractPrint";
 import {
   buildFinancialAnalysis,
   buildContractInvoiceArchiveRows,
@@ -1159,7 +1160,7 @@ function Finance() {
             <button
               type="button"
               className="contract-preview-print-btn"
-              onClick={() => window.print()}
+              onClick={() => openContractPrint(previewContract.id)}
               aria-label="Sözleşme çıktısı al veya PDF olarak kaydet"
               title="Çıktı al / PDF olarak kaydet"
             >
