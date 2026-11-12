@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extractInvoiceFields, parseInvoiceMoney, matchingInvoiceCompanies, matchInvoiceSeller, mergeInvoiceSuggestions } from './invoiceExtraction.js';
+import { extractInvoiceFields, findInvoiceCompanyMatch, parseInvoiceMoney, matchingInvoiceCompanies, matchInvoiceSeller, mergeInvoiceSuggestions } from './invoiceExtraction.js';
 import { validateInvoiceFile, abortable } from './localInvoiceReader.js';
 
 test('Turkish invoice extracts labelled fields and grand total, not VAT or subtotal', () => {
@@ -25,7 +25,7 @@ test('conflicting totals, invoice numbers, currencies and invalid date require m
 test('amount without an unambiguous currency is never imported as TRY', () => {
   assert.equal(extractInvoiceFields('Genel Toplam: 900,00').fields.amount, undefined);
 });
-test('company candidates use exact tax id, no fuzzy name matching or automatic creation', () => {
+test('company candidates use exact tax id and never create a company', () => {
   const companies = [{ id: 'a', name: 'ABC', taxNumber: '1234567890' }, { id: 'b', name: 'ABC' }];
   assert.deepEqual(matchingInvoiceCompanies(['1234567890'], companies).map(c => c.id), ['a']);
   assert.deepEqual(matchingInvoiceCompanies(['123456789'], companies), []);
@@ -50,9 +50,29 @@ test('seller matching requires a clear recipient and exactly one registered sell
   }
   const unlabelled = extractInvoiceFields(seller+'\n'+buyer.replace('SAYIN\n','')).seller;
   assert.equal(unlabelled.name, 'ÖRNEK FİRMA');
-  assert.equal(matchInvoiceSeller(unlabelled, companies), null);
+  assert.equal(matchInvoiceSeller(unlabelled, companies)?.id, 'supplier');
   assert.equal(extractInvoiceFields(buyer).seller, null);
   assert.equal(extractInvoiceFields(buyer+'\n'+seller+'\nVKN: 0000000003').seller, null);
+});
+test('unique strong legal-title match suggests the registered short company name', () => {
+  const seller = { name: 'BSA TOOLING KALIP PRES METAL FORM SANAYİ VE TİCARET LİMİTED ŞİRKETİ', taxNumber: '1871429265' };
+  const companies = [
+    { id: 'bsa', name: 'BSA TOOLİNG', taxNumber: null },
+    { id: 'other', name: 'ALPER KALIP', taxNumber: null },
+  ];
+  const match = findInvoiceCompanyMatch(seller, companies);
+  assert.equal(match.company.id, 'bsa');
+  assert.equal(match.method, 'strong-name');
+  assert.equal(match.confidence, 'review');
+});
+test('ambiguous or tax-conflicting names are never selected automatically', () => {
+  const seller = { name: 'BSA TOOLING SANAYİ VE TİCARET', taxNumber: '1871429265' };
+  assert.equal(findInvoiceCompanyMatch(seller, [
+    { id: 'a', name: 'BSA TOOLING' }, { id: 'b', name: 'BSA TOOLING' },
+  ]), null);
+  assert.equal(findInvoiceCompanyMatch(seller, [
+    { id: 'a', name: 'BSA TOOLING', taxNumber: '9999999999' },
+  ]), null);
 });
 test('manual edits and the amount/currency pair are preserved; no payment inference', () => {
   const form = { amount: '99', currency: 'USD', invoiceDate: '', invoiceNumber: '', invoiceIssued: false, status: 'pending', paymentDate: '', companyId: 'company' };

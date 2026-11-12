@@ -2,6 +2,15 @@
 const normalize = value => value.toLocaleUpperCase('tr-TR').replaceAll('İ', 'I')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const unique = values => [...new Set(values)];
+const normalizeTaxNumber = value => String(value || '').replace(/\D/g, '');
+
+export function normalizeInvoiceCompanyName(value) {
+  return normalize(String(value || ''))
+    .replace(/&/g, ' VE ')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
 
 // Identify parties from a labelled tax line and its adjacent address/title, not
 // from the first number or the PDF filename. An unlabelled layout is review-only.
@@ -24,12 +33,15 @@ function invoiceSeller(lines, originals, taxNumbers) {
   if (taxNumbers.length !== 2 || unique(parties.map(p => p.taxNumber)).length !== 2) return null;
   const buyers = parties.filter(p => p.buyer);
   const buyer = buyers.length === 1 ? buyers[0] : null;
-  // In unlabelled incoming invoices show a suggestion, never an automatic ID.
   const receiver = buyer ?? parties.find(p => /^DNA MUHENDISLIK KALIP MAKINE\b/.test(p.name));
   if (!receiver || !/^DNA MUHENDISLIK KALIP MAKINE\b/.test(receiver.name)) return null;
   const sellers = parties.filter(p => p.taxNumber !== receiver.taxNumber);
   if (!sellers.length || sellers.some(p => p.buyer || p.name !== sellers[0].name)) return null;
-  return { name: sellers[0].displayName, taxNumber: buyer ? sellers[0].taxNumber : null };
+  return {
+    name: sellers[0].displayName,
+    taxNumber: sellers[0].taxNumber,
+    identification: buyer ? 'labelled-recipient' : 'known-recipient',
+  };
 }
 
 export function parseInvoiceMoney(value) {
@@ -94,13 +106,52 @@ export function extractInvoiceFields(text) {
 }
 
 export function matchingInvoiceCompanies(taxNumbers, companies) {
-  return companies.filter(company => taxNumbers.includes(String(company.taxNumber || '').replace(/\D/g, '')));
+  const normalized = taxNumbers.map(normalizeTaxNumber).filter(Boolean);
+  return companies.filter(company => normalized.includes(normalizeTaxNumber(company.taxNumber)));
+}
+
+function strongNameMatch(sellerName, companyName) {
+  if (!sellerName || !companyName) return false;
+  if (sellerName === companyName) return true;
+  const companyTokens = companyName.split(' ');
+  // A short or single-word company name is not distinctive enough for an
+  // automatic prefix match. It can still be selected manually by the user.
+  if (companyTokens.length < 2 || companyName.replaceAll(' ', '').length < 6) return false;
+  return sellerName.startsWith(`${companyName} `) || companyName.startsWith(`${sellerName} `);
+}
+
+export function findInvoiceCompanyMatch(seller, companies) {
+  if (!seller) return null;
+  const sellerTaxNumber = normalizeTaxNumber(seller.taxNumber);
+  if (sellerTaxNumber) {
+    const taxMatches = matchingInvoiceCompanies([sellerTaxNumber], companies);
+    if (taxMatches.length === 1) {
+      return { company: taxMatches[0], method: 'tax-number', confidence: 'high' };
+    }
+    if (taxMatches.length > 1) return null;
+  }
+
+  const sellerName = normalizeInvoiceCompanyName(seller.name);
+  if (!sellerName) return null;
+  const compatible = companies.filter(company => {
+    const companyTaxNumber = normalizeTaxNumber(company.taxNumber);
+    return !sellerTaxNumber || !companyTaxNumber || companyTaxNumber === sellerTaxNumber;
+  });
+  const exactMatches = compatible.filter(company =>
+    normalizeInvoiceCompanyName(company.name) === sellerName);
+  if (exactMatches.length === 1) {
+    return { company: exactMatches[0], method: 'exact-name', confidence: 'high' };
+  }
+
+  const strongMatches = compatible.filter(company =>
+    strongNameMatch(sellerName, normalizeInvoiceCompanyName(company.name)));
+  return strongMatches.length === 1
+    ? { company: strongMatches[0], method: 'strong-name', confidence: 'review' }
+    : null;
 }
 
 export function matchInvoiceSeller(seller, companies) {
-  if (!seller?.taxNumber) return null;
-  const matches = matchingInvoiceCompanies([seller.taxNumber], companies);
-  return matches.length === 1 ? matches[0] : null;
+  return findInvoiceCompanyMatch(seller, companies)?.company || null;
 }
 
 export function mergeInvoiceSuggestions(form, fields, touched = new Set()) {

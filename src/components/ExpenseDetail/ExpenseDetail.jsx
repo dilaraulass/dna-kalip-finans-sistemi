@@ -43,15 +43,20 @@ function ExpenseDetail({
   archiving = false,
   mode = "edit",
   companyOptions = [],
+  existingInvoices = [],
   onCompanyCreated,
   onSave,
+  onSaveBatch,
   onArchive,
 }) {
   const [form, setForm] = useState(() => getInitialForm(selectedRow));
   const touchedFields = useRef(new Set());
   const lastImportedCompany = useRef(null);
   const [importedFields, setImportedFields] = useState({});
+  const [invoiceSeller, setInvoiceSeller] = useState(null);
+  const [companyMatch, setCompanyMatch] = useState(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [importMode, setImportMode] = useState('single');
   const formScope = useContext(FormScopeContext);
   const requestLeave = useLeaveConfirmation();
   const { can } = useAuth();
@@ -128,6 +133,7 @@ function ExpenseDetail({
   const selectedCompany = companyOptions.find(
     (company) => company.id === form.companyId,
   );
+  const sellerTaxNumber = String(invoiceSeller?.taxNumber || '').replace(/\D/g, '');
 
   function handleChange(event) {
     const { checked, name, type, value } = event.target;
@@ -141,6 +147,11 @@ function ExpenseDetail({
 
     if (name === "companyId") {
       if (value === "__new") {
+        setNewCompany((current) => ({
+          ...current,
+          name: current.name || invoiceSeller?.name || "",
+          taxNumber: current.taxNumber || sellerTaxNumber,
+        }));
         setShowCompanyForm(true);
       } else {
         selectCompany(value);
@@ -180,9 +191,16 @@ function ExpenseDetail({
     <div className="finance-detail">
       {isCreateMode && can('expenses.edit') && can('finance.view') && <InvoiceImport
         onBusyChange={setImportBusy}
+        onModeChange={setImportMode}
         companies={companyOptions} disabled={saving || companySaving || defaultsLoading || showCompanyForm}
-        onApply={(fields, sellerId) => {
+        expenseTypes={expenseTypes}
+        existingInvoices={existingInvoices}
+        onSaveBatch={onSaveBatch}
+        onApply={(fields, invoiceContext) => {
+          const sellerId = invoiceContext?.companyMatch?.company?.id || null;
           const touched = new Set(touchedFields.current);
+          setInvoiceSeller(invoiceContext?.seller || null);
+          setCompanyMatch(invoiceContext?.companyMatch || null);
           setForm(current => mergeInvoiceSuggestions(current, fields, touched));
           // Use the same merge rules for provenance, including the amount/currency pair.
           const imported = mergeInvoiceSuggestions({}, fields, touched);
@@ -316,7 +334,7 @@ function ExpenseDetail({
         </form>
       )}
 
-      {can("expenses.edit") && <form className="finance-detail-section" onSubmit={handleSubmit}>
+      {can("expenses.edit") && (!isCreateMode || importMode === 'single') && <form className="finance-detail-section" onSubmit={handleSubmit}>
         <h3>{isCreateMode ? "Yeni Fatura Bilgisi" : "Fatura Bilgilerini Güncelle"}</h3>
 
         {error && <div className="finance-detail-error">{error}</div>}
@@ -327,6 +345,8 @@ function ExpenseDetail({
           }}>Tekrar Dene</button>
         </div>}
         <p role="status">{defaultsLoading ? "Firmanın önceki fatura bilgileri alınıyor..." : defaultsMessage}</p>
+        {companyMatch?.method === 'strong-name' && selectedCompany?.id === companyMatch.company.id &&
+          <div className="invoice-import-notice"><span>Firma, faturadaki ünvan ile isim benzerliğine göre önerildi. Kaydetmeden önce seçimi kontrol edin.</span></div>}
 
         <div className="finance-detail-form-grid">
           <label>

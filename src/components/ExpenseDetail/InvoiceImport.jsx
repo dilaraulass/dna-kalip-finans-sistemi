@@ -1,15 +1,27 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { readLocalInvoice } from '../../services/localInvoiceReader';
-import { extractInvoiceFields, matchInvoiceSeller } from '../../services/invoiceExtraction';
+import { extractInvoiceFields, findInvoiceCompanyMatch } from '../../services/invoiceExtraction';
 import { useUnsavedChanges } from '../UnsavedChanges/useUnsavedChanges';
+import BatchInvoiceImport from './BatchInvoiceImport';
 import './InvoiceImport.css';
 import { FiFileText, FiUploadCloud, FiCheck, FiCheckCircle, FiAlertCircle, FiRefreshCw, FiMinus, FiPlus, FiChevronLeft, FiChevronRight, FiEye } from 'react-icons/fi';
 
 const labels = { invoiceNumber: 'Fatura no', invoiceDate: 'Fatura tarihi', amount: 'Ödenecek toplam', currency: 'Para birimi', dueDays: 'Vade (gün)' };
 
-export default function InvoiceImport({ companies, onApply, disabled, onBusyChange }) {
+export default function InvoiceImport({
+  companies,
+  expenseTypes,
+  existingInvoices,
+  onApply,
+  onSaveBatch,
+  disabled,
+  onBusyChange,
+  onModeChange,
+}) {
+  const [mode, setMode] = useState('single');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [batchBusy, setBatchBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
@@ -21,7 +33,8 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
   const request = useRef(null);
   useUnsavedChanges(false, { busy }); // The parent form tracks imported values as unsaved changes.
   useEffect(() => () => request.current?.abort(), []);
-  useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
+  useEffect(() => { onBusyChange(busy || batchBusy); return () => onBusyChange(false); }, [busy, batchBusy, onBusyChange]);
+  useEffect(() => { onModeChange?.(mode); }, [mode, onModeChange]);
   useEffect(() => {
     const element = viewport.current;
     if (!element) return;
@@ -61,8 +74,9 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
       const document = await readLocalInvoice(file, { signal: controller.signal, onProgress: setProgress });
       if (controller.signal.aborted) return;
       const extracted = extractInvoiceFields(document.text);
-      onApply(extracted.fields, matchInvoiceSeller(extracted.seller, companies)?.id);
-      setResult({ ...document, ...extracted, fileName: file.name });
+      const companyMatch = findInvoiceCompanyMatch(extracted.seller, companies);
+      onApply(extracted.fields, { seller: extracted.seller, companyMatch });
+      setResult({ ...document, ...extracted, companyMatch, fileName: file.name });
       setPage(0); setZoom(100);
     } catch (failure) {
       if (request.current === controller) setError(controller.signal.aborted ? controller.signal.reason?.message || 'Okuma iptal edildi.' :
@@ -86,6 +100,23 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
       <span className="invoice-import-icon" aria-hidden="true"><FiFileText /></span>
       <div><h3>Faturadan doldur</h3><p>Belgeyi seçin, bilgileri otomatik okuyalım.</p></div>
     </header>
+    <div className="invoice-import-mode" role="tablist" aria-label="Fatura yükleme şekli">
+      <button type="button" role="tab" aria-selected={mode === 'single'} disabled={busy || batchBusy}
+        onClick={() => setMode('single')}>Tek fatura</button>
+      <button type="button" role="tab" aria-selected={mode === 'batch'} disabled={busy || batchBusy}
+        onClick={() => setMode('batch')}>Çoklu yükle</button>
+    </div>
+    <div hidden={mode !== 'batch'}>
+      <BatchInvoiceImport
+        companies={companies}
+        expenseTypes={expenseTypes}
+        existingInvoices={existingInvoices}
+        disabled={disabled}
+        onBusyChange={setBatchBusy}
+        onSaveBatch={onSaveBatch}
+      />
+    </div>
+    <div hidden={mode !== 'single'}>
     <input ref={fileInput} className="invoice-import-input" type="file" accept=".pdf,.jpg,.jpeg,.png"
       aria-label="Fatura dosyası seç" disabled={disabled || busy} onChange={read} tabIndex={-1} />
     {!result && !busy && <>
@@ -139,5 +170,6 @@ export default function InvoiceImport({ companies, onApply, disabled, onBusyChan
         : 'Satıcı net okunamadı. Firmayı listeden seçin.'}</p>
       <div className="invoice-import-success" role="status"><FiCheck aria-hidden="true" /><span>Formdaki bilgileri ve ödenecek toplamı belgeyle karşılaştırıp kaydedin.<small>Elle girdiğiniz değerler korundu. Firma ve gider türünü seçin. Henüz kayıt oluşturulmadı.</small></span></div>
     </>}
+    </div>
   </section>;
 }

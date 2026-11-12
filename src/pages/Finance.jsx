@@ -645,6 +645,39 @@ function Finance() {
     }
   }
 
+  async function handleExpenseInvoiceBatchSave(drafts) {
+    if (!selectedRow?.isNew || drafts.length === 0) return [];
+
+    setDetailUpdateSubmitting(true);
+    setDetailUpdateError("");
+    const results = [];
+    try {
+      // Keep each request independent: one invalid invoice must not hide the
+      // successfully saved records from the user.
+      for (const draft of drafts) {
+        try {
+          const created = await createExpenseInvoice(draft.payload);
+          results.push({ draftId: draft.draftId, ok: true, created });
+        } catch (requestError) {
+          results.push({
+            draftId: draft.draftId,
+            ok: false,
+            error: requestError.message || "Fatura kaydedilemedi.",
+          });
+        }
+      }
+      await loadFinanceDashboard();
+      return results;
+    } catch (requestError) {
+      setDetailUpdateError(
+        requestError.message || "Fatura listesi yenilenemedi.",
+      );
+      return results;
+    } finally {
+      setDetailUpdateSubmitting(false);
+    }
+  }
+
   function handleCreateExpenseInvoice() {
     setDetailUpdateError("");
     setSelectedRow({ ...NEW_EXPENSE_INVOICE_ROW });
@@ -1119,7 +1152,7 @@ function Finance() {
         subtitle={
           expenseModule ? selectedRow?.company : selectedRow?.contractNumber
         }
-        width={520}
+        width={expenseModule && selectedRow?.isNew ? 760 : 520}
       >
         {expenseModule ? (
           <ExpenseDetail
@@ -1131,10 +1164,12 @@ function Finance() {
             archiving={detailArchiveSubmitting}
             mode={selectedRow?.isNew ? "create" : "edit"}
             companyOptions={companyOptions}
+            existingInvoices={expenseRows}
             onCompanyCreated={(company) => setCompanyOptions((current) =>
               [...current.filter((item) => item.id !== company.id), company]
                 .sort((a, b) => a.name.localeCompare(b.name, "tr")))}
             onSave={handleExpenseInvoiceSave}
+            onSaveBatch={handleExpenseInvoiceBatchSave}
             onArchive={handleExpenseInvoiceArchive}
           />
         ) : (
